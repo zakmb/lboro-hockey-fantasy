@@ -178,7 +178,6 @@ export default function Admin(){
 					<input type="checkbox" checked={transfersEnabled} onChange={e=>toggleTransfers(e.target.checked)} />
 					Enable Transfers
 				</label>
-				<div className="subtitle" style={{marginTop:8}}>Players: {totals.count} • Avg Price: £{totals.avgPrice}M</div>
 			</div>
 
 			<div className="card">

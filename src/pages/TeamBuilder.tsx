@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { Player, TeamCode, Position } from '../types'
 import { TEAM_LABEL } from '../types'
 import { db } from '../lib/firebase'
-import { collection, onSnapshot, doc, setDoc, getDoc } from 'firebase/firestore'
+import { collection, onSnapshot, doc, setDoc, getDoc, getDocs, writeBatch } from 'firebase/firestore'
 import { useAuth } from '../contexts/AuthContext'
 
 const TEAMS: TeamCode[] = ['Men1','Men2','Men3','Men4','Men5']
@@ -20,6 +20,7 @@ function next19Midnight(): Date {
 
 export default function TeamBuilder(){
 	const { user } = useAuth()
+	const prevTransfersEnabledRef = useRef<boolean>(false)
 	const [pool,setPool]=useState<Player[]>([])
 	const [selected,setSelected]=useState<string[]>([])
 	const [captainId,setCaptainId]=useState<string>('')
@@ -55,9 +56,27 @@ export default function TeamBuilder(){
 			snap.forEach(d=> list.push(d.data() as Player))
 			setPool(list.length? list : defaultPool())
 		})
-		const unsubConfig = onSnapshot(doc(db,'config','league'), (s)=>{
+		const unsubConfig = onSnapshot(doc(db,'config','league'), async (s)=>{
 			const data = s.data() as any
-			if (data?.transfersEnabled !== undefined) setTransfersEnabled(!!data.transfersEnabled)
+			if (data?.transfersEnabled !== undefined){
+				const next = !!data.transfersEnabled
+				const prev = prevTransfersEnabledRef.current
+				setTransfersEnabled(next)
+				// When toggled from false -> true, reset transferUsed for all teams
+				if (prev === false && next === true){
+					try{
+						const batch = writeBatch(db)
+						const teamsSnap = await getDocs(collection(db,'teams'))
+						teamsSnap.forEach(docSnap=>{
+							batch.set(doc(db,'teams',docSnap.id), { transferUsed: false }, { merge: true })
+						})
+						await batch.commit()
+					}catch(err){
+						console.error('Failed to reset transferUsed for all teams', err)
+					}
+				}
+				prevTransfersEnabledRef.current = next
+			}
 		})
 		return ()=>{ unsubPlayers(); unsubConfig() }
 	},[])
@@ -112,6 +131,8 @@ export default function TeamBuilder(){
 
 	// Transfer limit calculation (symmetric diff/2 additions/removals)
 	const transfersUsed = useMemo(()=>{
+		// For new accounts (baseline is empty), transfersUsed should be 0
+		if (baseline.length === 0) return 0
 		const base = new Set(baseline)
 		const now = new Set(selected)
 		let diff = 0
@@ -129,12 +150,22 @@ export default function TeamBuilder(){
 	// Post-deadline rule: if not transfersEnabled -> no edits; if enabled -> allow remaining transfer(s) + captain change
 	const deadlinePolicyOk = useMemo(()=>{
 		if (!afterDeadline) return true
+		// For new players (baseline is empty), always allow team creation after deadline
+		if (baseline.length === 0) return captainValid
 		if (!transfersEnabled) return JSON.stringify(selected.sort())===JSON.stringify(baseline.sort()) && captainValid
+		// For existing teams, check transfer limits
 		return transfersUsed <= allowedTransfersAfterDeadline && captainValid
 	},[afterDeadline,transfersEnabled,transfersUsed,allowedTransfersAfterDeadline,baseline,selected,captainValid])
 
 	const canSave = selected.length===11 && meetsTeamMin && meetsTeamMax && meetsFormation && captainValid && deadlinePolicyOk && squadCost <= budget
-	const hardDisabled = afterDeadline && !transfersEnabled
+	const hardDisabled = afterDeadline && !transfersEnabled && baseline.length > 0
+	
+	// Check if any changes have been made (for reset button)
+	const hasChanges = useMemo(() => {
+		const playersChanged = JSON.stringify(selected.sort()) !== JSON.stringify(baseline.sort())
+		const captainChanged = captainId !== baselineCaptain
+		return playersChanged || captainChanged
+	}, [selected, baseline, captainId, baselineCaptain])
 
 	const errorMessages = useMemo(()=>{
 		const errs: string[] = []
@@ -146,18 +177,46 @@ export default function TeamBuilder(){
 		if (counts.MID !== 3) errs.push('You must pick exactly 3 Midfielders.')
 		if (counts.FWD !== 3) errs.push('You must pick exactly 3 Forwards.')
 		if (!captainValid) errs.push('Select a captain from your 11 players.')
-		if (afterDeadline && !transfersEnabled) errs.push('Transfer window closed. No changes allowed.')
-		if (afterDeadline && transfersEnabled && transfersUsed>1) errs.push('Only 1 transfer allowed while transfers are enabled.')
+		if (afterDeadline && !transfersEnabled && baseline.length > 0) errs.push('Transfer window closed. No changes allowed.')
+		if (afterDeadline && transfersEnabled && baseline.length > 0 && transfersUsed>1) errs.push('Only 1 transfer allowed while transfers are enabled.')
 		if (squadCost > budget) errs.push(`Budget exceeded: £${squadCost.toFixed(1)}M / £${budget.toFixed(1)}M`)
 		return errs
 	},[selected.length, byTeam, counts, captainValid, afterDeadline, transfersEnabled, transfersUsed, squadCost, budget])
 
-	function canPickByPosition(p: Player): boolean { const nc={...counts} as Record<Position,number>; nc[p.position]++; if(p.position==='GK'&&nc.GK>1)return false; if(p.position==='DEF'&&nc.DEF>4)return false; if(p.position==='MID'&&nc.MID>3)return false; if(p.position==='FWD'&&nc.FWD>3)return false; return selected.length<11 }
+	function canPickByPosition(p: Player): boolean { 
+		// Check position constraints
+		const nc={...counts} as Record<Position,number>; 
+		nc[p.position]++; 
+		if(p.position==='GK'&&nc.GK>1)return false; 
+		if(p.position==='DEF'&&nc.DEF>4)return false; 
+		if(p.position==='MID'&&nc.MID>3)return false; 
+		if(p.position==='FWD'&&nc.FWD>3)return false; 
+		
+		// Check team constraints
+		const currentByTeam = {...byTeam}
+		currentByTeam[p.team]++
+		if (currentByTeam[p.team] > MAX_PER_TEAM) return false
+		
+		// Check budget constraints
+		const newSquadCost = squadCost + p.price
+		if (newSquadCost > budget) return false
+		
+		// Check total players
+		return selected.length < 11
+	}
 
 	function toggle(id:string, e: React.MouseEvent){ 
 		e.preventDefault() // Prevent page scroll
+		e.stopPropagation() // Prevent event bubbling
 		const p=pool.find(x=>x.id===id)!; 
 		if(selected.includes(id)){ 
+			// Prevent deselecting players when transfers are disabled or used up
+			// For new accounts (baseline empty), always allow deselecting
+			if (baseline.length === 0) {
+				// Allow deselecting for new accounts
+			} else if (hardDisabled || (afterDeadline && transfersEnabled && transferUsed)) {
+				return
+			}
 			setSelected(prev=>prev.filter(x=>x!==id)); 
 			if(captainId===id) setCaptainId(''); 
 			// Add player's price back to bank when removing
@@ -167,13 +226,23 @@ export default function TeamBuilder(){
 		// Prevent picking beyond window rules (after deadline, transfers enabled, only 1 transfer)
 		if (canPickByPosition(p)) {
 			const simulate = [...selected, id]
-			if (afterDeadline && transfersEnabled) {
-				const base = new Set(baseline)
-				let diff = 0
-				for (const pid of simulate) if (!base.has(pid)) diff++
-				for (const pid of base) if (!simulate.includes(pid)) diff++
-				const used = Math.ceil(diff/2)
-				if (used>1) return
+			if (afterDeadline) {
+				// For new accounts (baseline is empty), always allow full team creation
+				if (baseline.length === 0) {
+					// Allow adding players up to 11 for new accounts
+					if (simulate.length > 11) return
+				} else if (transfersEnabled) {
+					// For existing teams, apply transfer limits
+					const base = new Set(baseline)
+					let diff = 0
+					for (const pid of simulate) if (!base.has(pid)) diff++
+					for (const pid of base) if (!simulate.includes(pid)) diff++
+					const used = Math.ceil(diff/2)
+					if (used>1) return
+				} else {
+					// Transfers not enabled, no changes allowed for existing teams
+					return
+				}
 			}
 			// Subtract player's price from bank when adding
 			setBank(prev => prev - p.price)
@@ -191,7 +260,7 @@ export default function TeamBuilder(){
 		if (baseline.length===0 && selected.length===11){
 			for (const p of selectedPlayers){ 
 				nextBuy[p.id] = p.price 
-				nextBank -= p.price // Subtract each player's price from budget
+				// Don't subtract from bank - it's already correct from player selection
 			}
 		} else {
 			// For team changes, handle player replacements
@@ -231,8 +300,14 @@ export default function TeamBuilder(){
 			players: selected, 
 			captainId, 
 			bank: parseFloat(nextBank.toFixed(1)), 
+			budget: BUDGET_LIMIT, // Save the total budget (100M)
 			buyPrices: nextBuy, 
 			updatedAt: Date.now() 
+		}
+		
+		// Add createdAt only for first-time team creation
+		if (baseline.length===0 && selected.length===11) {
+			payload.createdAt = Date.now()
 		}
 		
 		if (afterDeadline && transfersEnabled && transfersUsed>0) payload.transferUsed = true
@@ -252,7 +327,12 @@ export default function TeamBuilder(){
 		setBank(originalBank)
 	}
 
-	const byPos = useMemo(()=>({ GK: pool.filter(p=>p.position==='GK'), DEF: pool.filter(p=>p.position==='DEF'), MID: pool.filter(p=>p.position==='MID'), FWD: pool.filter(p=>p.position==='FWD') }),[pool])
+	const byPos = useMemo(()=>({ 
+		GK: pool.filter(p=>p.position==='GK').sort((a,b)=>b.pointsTotal-a.pointsTotal), 
+		DEF: pool.filter(p=>p.position==='DEF').sort((a,b)=>b.pointsTotal-a.pointsTotal), 
+		MID: pool.filter(p=>p.position==='MID').sort((a,b)=>b.pointsTotal-a.pointsTotal), 
+		FWD: pool.filter(p=>p.position==='FWD').sort((a,b)=>b.pointsTotal-a.pointsTotal) 
+	}),[pool])
 
 	function PosList({ pos, title }:{ pos: Position, title: string }){ return (
 		<div className="card">
@@ -273,9 +353,13 @@ export default function TeamBuilder(){
 				}}>▼</div>
 			</div>
 			{!collapsedPositions[pos] && (
-				<div className="grid" style={{gridTemplateColumns:'repeat(3,1fr)',gap:12}}>
-					{byPos[pos].map(p=>{ const isSel=selected.includes(p.id); const disabled=!isSel && !canPickByPosition(p); return (
-						<button key={p.id} disabled={disabled} onClick={(e)=>toggle(p.id, e)} className="card" style={{
+				<div className="grid" style={{
+					gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))',
+					gap:12,
+					alignItems:'stretch'
+				}}>
+					{byPos[pos].map(p=>{ const isSel=selected.includes(p.id); const disabled=!isSel && !canPickByPosition(p) || (isSel && (hardDisabled || (afterDeadline && transfersEnabled && transferUsed))); return (
+						<div key={p.id} onClick={disabled ? undefined : (e)=>toggle(p.id, e)} className="card" style={{
 						textAlign:'left',
 						opacity: disabled ? 0.6 : 1,
 						borderColor: isSel ? 'var(--primary)' : 'var(--border)',
@@ -286,19 +370,27 @@ export default function TeamBuilder(){
 						cursor: disabled ? 'not-allowed' : 'pointer',
 						transform: isSel ? 'translateY(-2px)' : 'none',
 						display:'grid',
-						gridTemplateColumns:'50px 1fr',
-						alignItems:'center',
-						gap:12,
-						padding: '16px',
+						gridTemplateColumns:'60px 1fr',
+						alignItems:'stretch',
+						gap:16,
+						padding: '20px',
 						borderRadius: '12px',
-						minHeight: '80px'
+						minHeight: '120px',
+						width: '100%',
+						overflow: 'hidden',
+						userSelect: 'none'
 					}}>
 						<div style={{
 							textAlign:'center',
 							background: isSel ? 'var(--primary)' : '#f8fafc',
 							borderRadius: '8px',
-							padding: '8px 4px',
-							minWidth: '42px'
+							padding: '14px 8px',
+							minWidth: '50px',
+							display: 'flex',
+							flexDirection: 'column',
+							justifyContent: 'center',
+							alignItems: 'center',
+							height: '100%'
 						}}>
 							<div style={{
 								fontWeight:700,
@@ -318,29 +410,38 @@ export default function TeamBuilder(){
 								marginTop: '4px'
 							}}>Prev GW {p.prevGwPoints}</div>
 						</div>
-						<div style={{minWidth: 0}}>
+						<div style={{
+							minWidth: 0,
+							display: 'flex',
+							flexDirection: 'column',
+							justifyContent: 'center',
+							overflow: 'hidden'
+						}}>
 							<div style={{
 								fontWeight: 600,
 								fontSize: '14px',
 								color: '#1e293b',
-								marginBottom: '4px',
+								marginBottom: '6px',
 								whiteSpace: 'nowrap',
 								overflow: 'hidden',
-								textOverflow: 'ellipsis'
+								textOverflow: 'ellipsis',
+								lineHeight: '1.2'
 							}}>{p.name}</div>
 							<div style={{
 								fontSize: '12px',
 								color: '#64748b',
 								fontWeight: 500,
-								lineHeight: '1.3'
+								lineHeight: '1.3',
+								marginBottom: '4px'
 							}}>{TEAM_LABEL[p.team]}</div>
 							<div style={{
-								fontSize: '12px',
+								fontSize: '13px',
 								color: '#059669',
-								fontWeight: 600
+								fontWeight: 600,
+								lineHeight: '1.2'
 							}}>£{p.price}M</div>
 						</div>
-					</button>)})}
+					</div>)})}
 				</div>
 			)}
 		</div>) }
@@ -349,10 +450,10 @@ export default function TeamBuilder(){
 		<div className="card" style={{background:'linear-gradient(#e8f6ff,#eef7ff)',borderColor:'#d7e6ff'}}>
 			<h3>Team</h3>
 			<div style={{height:12}}/>
-			<div style={{display:'grid',gap:12}}>
+			<div style={{display:'grid',gap:20}}>
 				<Row players={fwd} />
 				<Row players={mid} />
-				<Row players={def} />
+				<Row players={def} isDefenders={true} />
 				<Row players={gk} />
 			</div>
 			{!afterDeadline && (
@@ -360,16 +461,38 @@ export default function TeamBuilder(){
 			)}
 		</div>) }
 
-	function Row({ players }:{ players: Player[] }){ return (
-		<div style={{display:'flex',justifyContent:'center',gap:12}}>
+	function Row({ players, isDefenders = false }:{ players: Player[], isDefenders?: boolean }){ return (
+		<div style={{
+			display:'flex',
+			justifyContent:'center',
+			gap:16,
+			flexWrap: 'wrap',
+			overflowX: 'visible'
+		}}>
 			{players.map(p=> (
-				<div key={p.id} className="card" style={{minWidth:140,textAlign:'center',position:'relative'}}>
+				<div key={p.id} className="card" style={{
+					minWidth: isDefenders ? 140 : 160,
+					maxWidth: isDefenders ? 160 : 180,
+					textAlign:'center',
+					position:'relative',
+					padding:'16px 12px',
+					overflow:'hidden',
+					flexShrink: 0
+				}}>
 					{captainId===p.id && (
-						<div style={{position:'absolute',top:8,right:8,background:'var(--primary)',color:'#fff',borderRadius:'999px',padding:'2px 6px',fontSize:12,fontWeight:700}}>C</div>
+						<div style={{position:'absolute',top:6,right:6,background:'var(--primary)',color:'#fff',borderRadius:'999px',padding:'2px 6px',fontSize:11,fontWeight:700}}>C</div>
 					)}
-					<b>{p.name.split(' ')[0]}</b>
-					<div className="subtitle">{p.position}</div>
-					<div style={{marginTop:6,fontSize:12}}>
+					<div style={{
+						fontWeight:600,
+						fontSize: isDefenders ? '12px' : '13px',
+						lineHeight:'1.2',
+						marginBottom:'4px',
+						whiteSpace:'nowrap',
+						overflow:'hidden',
+						textOverflow:'ellipsis'
+					}}>{p.name}</div>
+					<div className="subtitle" style={{fontSize:'11px',marginBottom:'4px'}}>{p.position}</div>
+					<div style={{fontSize:11,color:'#64748b'}}>
 						Prev GW: {p.prevGwPoints}
 					</div>
 				</div>
@@ -377,14 +500,20 @@ export default function TeamBuilder(){
 		</div>) }
 
 	return (
-		<div className="grid" style={{gridTemplateColumns:'1.2fr 1fr', alignItems:'start'}}>
-			<div className="grid">
+		<div className="grid" style={{
+			gridTemplateColumns:'1fr 1.5fr', 
+			alignItems:'start',
+			gap:'20px',
+			minHeight:'100vh',
+			padding:'0 10px'
+		}}>
+			<div className="grid" style={{gap:'24px'}}>
 				<PosList pos="GK" title="Goalkeepers" />
 				<PosList pos="DEF" title="Defenders" />
 				<PosList pos="MID" title="Midfielders" />
 				<PosList pos="FWD" title="Forwards" />
 			</div>
-			<div className="grid">
+			<div className="grid" style={{gap:'24px'}}>
 				{afterDeadline && transfersEnabled && transferUsed && (
 					<div className="card" style={{borderColor:'#e9d5ff',background:'#faf5ff',color:'#6b21a8'}}>
 						You have made your change for this week. You can still change your captain.
@@ -414,7 +543,7 @@ export default function TeamBuilder(){
 						</div>
 					)}
 					<button disabled={hardDisabled || !canSave} className="btn" onClick={saveTeam} style={(hardDisabled || !canSave)?{opacity:.5,cursor:'not-allowed',background:'#b9a8d6'}:undefined}>Save Team</button>
-					<button className="btn secondary" onClick={resetTeam} style={{marginLeft:8}}>Reset</button>
+					<button disabled={!hasChanges} className="btn secondary" onClick={resetTeam} style={!hasChanges?{opacity:.5,cursor:'not-allowed'}:{marginLeft:8}}>Reset</button>
 				</div>
 			</div>
 		</div>
