@@ -184,7 +184,7 @@ export default function TeamBuilder(){
 	async function saveTeam(){
 		if(!user||!canSave) return;
 		
-		let nextBank = 100 // Start with £100M budget
+		let nextBank = bank // Start with current bank balance
 		let nextBuy = { ...buyPrices }
 		
 		// On first-time team creation, initialize buyPrices
@@ -219,6 +219,9 @@ export default function TeamBuilder(){
 					}
 				}
 			}
+			
+			// Ensure bank doesn't go below 0
+			nextBank = Math.max(0, nextBank)
 		}
 		
 		const payload: any = { 
