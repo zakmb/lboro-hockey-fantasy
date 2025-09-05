@@ -455,7 +455,7 @@ export default function TeamBuilder(){
 				<Row players={gk} />
 			</div>
 			{!afterDeadline && (
-				<div className="subtitle" style={{marginTop:12}}>Deadline to change teams: {deadline.toLocaleDateString()} 12:00 — {countdown || 'Deadline passed'}</div>
+				<div className="subtitle" style={{marginTop:12}}>Deadline to change teams: {deadline.toLocaleDateString('en-GB')} 12:00 — {countdown || 'Deadline passed'}</div>
 			)}
 		</div>) }
 
