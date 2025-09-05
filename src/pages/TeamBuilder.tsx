@@ -10,11 +10,9 @@ const FORMATION = { GK: 1, DEF: 4, MID: 3, FWD: 3 } as const
 const MAX_PER_TEAM = 3
 const BUDGET_LIMIT = 100
 
-function next19Midnight(): Date {
-	// Set deadline to tomorrow at 7pm
-	const d = new Date()
-	d.setDate(d.getDate() + 1)
-	d.setHours(19, 0, 0, 0)
+function getDeadline(): Date {
+	// Set deadline to September 6th, 2025 at midday (12:00 PM)
+	const d = new Date(2025, 8, 6, 12, 0, 0, 0) // Month is 0-indexed, so 8 = September
 	return d
 }
 
@@ -27,7 +25,7 @@ export default function TeamBuilder(){
 	const [baseline,setBaseline]=useState<string[]>([]) // team at window start or loaded from DB
 	const [baselineCaptain,setBaselineCaptain]=useState<string>('')
 	const [transfersEnabled,setTransfersEnabled]=useState<boolean>(false)
-	const [deadline,setDeadline]=useState<Date>(next19Midnight())
+	const [deadline,setDeadline]=useState<Date>(getDeadline())
 	const [countdown,setCountdown]=useState<string>('')
 	const [transferUsed,setTransferUsed]=useState<boolean>(false)
 	const [bank,setBank]=useState<number>(100)
@@ -457,7 +455,7 @@ export default function TeamBuilder(){
 				<Row players={gk} />
 			</div>
 			{!afterDeadline && (
-				<div className="subtitle" style={{marginTop:12}}>Deadline to change teams: {deadline.toLocaleDateString()} 00:00 — {countdown || 'Deadline passed'}</div>
+				<div className="subtitle" style={{marginTop:12}}>Deadline to change teams: {deadline.toLocaleDateString()} 12:00 — {countdown || 'Deadline passed'}</div>
 			)}
 		</div>) }
 
