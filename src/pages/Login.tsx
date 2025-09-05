@@ -5,13 +5,19 @@ import { useAuth } from '../contexts/AuthContext'
 export default function Login(){
 	const { login } = useAuth()
 	const nav = useNavigate()
-	const [email,setEmail]=useState('')
-	const [password,setPassword]=useState('')
-	const [error,setError]=useState('')
+	const [email, setEmail] = useState('')
+	const [password, setPassword] = useState('')
+	const [error, setError] = useState('')
 
-	async function onSubmit(e:React.FormEvent){
+	async function onSubmit(e: React.FormEvent){
 		e.preventDefault()
-		try{ setError(''); await login(email,password); nav('/') }catch(err){ setError('Failed to sign in') }
+		try{ 
+			setError('')
+			await login(email, password)
+			nav('/') 
+		} catch(err){ 
+			setError('Failed to sign in') 
+		}
 	}
 
 	return (

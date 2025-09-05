@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { db } from '../lib/firebase'
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore'
-import { useAuth } from '../contexts/AuthContext'
-import { TEAM_LABEL, TeamCode } from '../types'
+import { collection, onSnapshot } from 'firebase/firestore'
 
 interface TeamData {
 	id: string
@@ -16,24 +14,12 @@ interface TeamData {
 	updatedAt: number
 }
 
-interface PlayerData {
-	id: string
-	name: string
-	team: TeamCode
-	position: string
-	pointsTotal: number
-	prevGwPoints: number
-	price: number
-}
 
 export default function LeagueTable() {
-	const { user } = useAuth()
 	const [teams, setTeams] = useState<TeamData[]>([])
-	const [players, setPlayers] = useState<PlayerData[]>([])
 	const [loading, setLoading] = useState(true)
 
 	useEffect(() => {
-		// Fetch all teams
 		const unsubTeams = onSnapshot(collection(db, 'teams'), (snapshot) => {
 			const teamsList: TeamData[] = []
 			snapshot.forEach((doc) => {
@@ -50,33 +36,18 @@ export default function LeagueTable() {
 				}
 			})
 			
-			// Sort by total points (descending)
 			teamsList.sort((a, b) => (b.teamPointsTotal || 0) - (a.teamPointsTotal || 0))
 			setTeams(teamsList)
 		})
 
-		// Fetch all players for team details
-		const unsubPlayers = onSnapshot(collection(db, 'players'), (snapshot) => {
-			const playersList: PlayerData[] = []
-			snapshot.forEach((doc) => {
-				const data = doc.data() as PlayerData
-				playersList.push({
-					...data,
-					id: doc.id
-				})
-			})
-			setPlayers(playersList)
-			setLoading(false)
-		})
+		setLoading(false)
 
 		return () => {
 			unsubTeams()
-			unsubPlayers()
 		}
 	}, [])
 
 	function getTeamName(team: TeamData): string {
-		// Use the display name from the team data, fallback to "Team {userId}"
 		return team.displayName || `Team ${team.userId.slice(-4)}`
 	}
 

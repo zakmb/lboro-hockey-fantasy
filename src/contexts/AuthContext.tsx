@@ -19,30 +19,11 @@ export const useAuth = () => {
 	return v
 }
 
-function isMockAuth(): boolean {
-	try {
-		// If firebase config is not set, our apiKey is the placeholder
-		const apiKey = (auth as any)?._config?.apiKey || (auth as any)?.app?.options?.apiKey
-		return !apiKey || String(apiKey).includes('REPLACE_ME')
-	} catch {
-		return true
-	}
-}
-
-const MOCK_KEY = 'fhfl_mock_user'
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const [user, setUser] = useState<UserProfile | null>(null)
 	const [loading, setLoading] = useState(true)
-	const useMock = isMockAuth()
 
 	useEffect(() => {
-		if (useMock) {
-			const raw = localStorage.getItem(MOCK_KEY)
-			setUser(raw ? JSON.parse(raw) as UserProfile : null)
-			setLoading(false)
-			return
-		}
 		const unsub = onAuthStateChanged(auth, (u) => {
 			if (u) {
 				setUser({ id: u.uid, email: u.email || '', displayName: u.displayName || 'Manager' })
@@ -52,37 +33,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			setLoading(false)
 		})
 		return () => unsub()
-	// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [useMock])
+	}, [])
 
 	async function login(email: string, password: string) {
-		if (useMock) {
-			const mock: UserProfile = { id: 'mock-' + btoa(email), email, displayName: email.split('@')[0] }
-			localStorage.setItem(MOCK_KEY, JSON.stringify(mock))
-			setUser(mock)
-			return
-		}
 		await signInWithEmailAndPassword(auth, email, password)
 	}
 
 	async function register(email: string, password: string, displayName: string) {
-		if (useMock) {
-			const mock: UserProfile = { id: 'mock-' + btoa(email), email, displayName }
-			localStorage.setItem(MOCK_KEY, JSON.stringify(mock))
-			setUser(mock)
-			return
-		}
 		const cred = await createUserWithEmailAndPassword(auth, email, password)
 		if (auth.currentUser) await updateProfile(auth.currentUser, { displayName })
 		setUser({ id: cred.user.uid, email, displayName })
 	}
 
 	async function logout() {
-		if (useMock) {
-			localStorage.removeItem(MOCK_KEY)
-			setUser(null)
-			return
-		}
 		await signOut(auth)
 	}
 

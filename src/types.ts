@@ -18,7 +18,6 @@ export interface Player {
 	pointsTotal: number
 	pointsGw: number
 	prevGwPoints: number
-	// Event stats tracked in DB
 	goals: number
 	assists: number
 	cleanSheets: number
@@ -48,6 +47,7 @@ export interface FantasyTeam {
 export interface LeagueSettings {
 	transfersEnabled: boolean
 	minPerTeams: Record<TeamCode, number>
+    //TODO: Remove references to budgetStart
 	budgetStart: number
 }
 

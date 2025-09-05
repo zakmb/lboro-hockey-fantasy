@@ -44,12 +44,10 @@ export default function PlayerStats() {
 			let aValue: any = a[sortField]
 			let bValue: any = b[sortField]
 
-			// Handle numeric fields
 			if (typeof aValue === 'number' && typeof bValue === 'number') {
 				return sortDirection === 'asc' ? aValue - bValue : bValue - aValue
 			}
 
-			// Handle position field with custom ordering
 			if (sortField === 'position') {
 				const positionOrder = { 'GK': 1, 'DEF': 2, 'MID': 3, 'FWD': 4 }
 				const aPos = positionOrder[aValue as keyof typeof positionOrder] || 0
@@ -57,7 +55,6 @@ export default function PlayerStats() {
 				return sortDirection === 'asc' ? aPos - bPos : bPos - aPos
 			}
 
-			// Handle string fields
 			if (typeof aValue === 'string' && typeof bValue === 'string') {
 				aValue = aValue.toLowerCase()
 				bValue = bValue.toLowerCase()

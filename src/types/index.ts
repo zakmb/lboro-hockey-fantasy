@@ -1,4 +1,3 @@
-// Player types
 export interface Player {
   id: string;
   name: string;
@@ -11,14 +10,13 @@ export interface Player {
   cleanSheets: number;
   yellowCards: number;
   redCards: number;
-  form: number; // Average points in last 5 games
-  selectedBy: number; // Percentage of teams that have selected this player
+  form: number;
+  selectedBy: number;
   imageUrl?: string;
 }
 
 export type PlayerPosition = 'Goalkeeper' | 'Defender' | 'Midfielder' | 'Forward';
 
-// Team types
 export interface FantasyTeam {
   id: string;
   userId: string;
@@ -31,9 +29,10 @@ export interface FantasyTeam {
   };
   captain: Player;
   viceCaptain: Player;
-  formation: string; // e.g., "4-4-2"
+  //TODO: Remove references to formation
+  formation: string;
   totalValue: number;
-  bank: number; // Remaining budget
+  bank: number;
   totalPoints: number;
   gameweekPoints: number;
   rank: number;
@@ -41,7 +40,6 @@ export interface FantasyTeam {
   transfersRemaining: number;
 }
 
-// League types
 export interface League {
   id: string;
   name: string;
@@ -53,7 +51,6 @@ export interface League {
   createdAt: Date;
 }
 
-// User types
 export interface User {
   id: string;
   email: string;
@@ -65,7 +62,6 @@ export interface User {
   rank: number;
 }
 
-// Gameweek types
 export interface Gameweek {
   id: string;
   number: number;
@@ -98,7 +94,6 @@ export interface PlayerFixtureStats {
   totalPoints: number;
 }
 
-// Transfer types
 export interface Transfer {
   id: string;
   teamId: string;
@@ -106,6 +101,6 @@ export interface Transfer {
   playerIn: Player;
   gameweek: number;
   timestamp: Date;
-  cost: number; // Transfer cost (usually 0 for free transfers)
+  cost: number;
 }
 

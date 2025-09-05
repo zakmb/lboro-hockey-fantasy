@@ -1,19 +1,129 @@
-*{box-sizing:border-box}
-html,body,#root{height:100%}
-:root{--bg:#f6f5fb;--surface:#ffffff;--border:#e6e2f3;--text:#1a1333;--muted:#6b5fa6;--primary:#5c2d91;--primary-700:#431f6c;--accent:#ff2e88}
-body{margin:0;font-family:Inter,system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}
-a{color:inherit;text-decoration:none}
-.container{max-width:1180px;margin:0 auto;padding:16px}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;box-shadow:0 10px 24px rgba(92,45,145,.06)}
-.btn{padding:10px 14px;border-radius:12px;border:1px solid transparent;background:var(--primary);color:#fff;cursor:pointer;font-weight:600}
-.btn:hover{background:var(--primary-700)}
-.btn.secondary{background:#fff;color:var(--primary);border-color:var(--border)}
-.btn.ghost{background:transparent;color:var(--primary);border-color:transparent}
-.input{width:100%;padding:12px 12px;border:1px solid var(--border);border-radius:12px;background:#fff}
-.grid{display:grid;gap:16px}
-nav.app{display:grid;grid-template-columns:1fr auto auto auto;align-items:center;background:#fff;border:1px solid var(--border);border-radius:12px;padding:10px 14px}
-nav.app a{padding:6px 10px;border-radius:10px;color:var(--muted)}
-nav.app a:hover{background:#f1ecfb;color:var(--text)}
-h1,h2,h3{margin:0 0 8px}
-.subtitle{color:var(--muted)}
+/* CSS Reset & Base Styles */
+* {
+	box-sizing: border-box;
+}
 
+html, body, #root {
+	height: 100%;
+}
+
+/* CSS Custom Properties */
+:root {
+	--bg: #f6f5fb;
+	--surface: #ffffff;
+	--border: #e6e2f3;
+	--text: #1a1333;
+	--muted: #6b5fa6;
+	--primary: #5c2d91;
+	--primary-700: #431f6c;
+	--accent: #ff2e88;
+}
+
+/* Base Typography & Layout */
+body {
+	margin: 0;
+	font-family: Inter, system-ui, Segoe UI, Arial, sans-serif;
+	background: var(--bg);
+	color: var(--text);
+}
+
+a {
+	color: inherit;
+	text-decoration: none;
+}
+
+/* Layout Components */
+.container {
+	max-width: 1180px;
+	margin: 0 auto;
+	padding: 16px;
+}
+
+.grid {
+	display: grid;
+	gap: 16px;
+}
+
+/* Card Component */
+.card {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 14px;
+	padding: 18px;
+	box-shadow: 0 10px 24px rgba(92, 45, 145, 0.06);
+}
+
+/* Button Components */
+.btn {
+	padding: 10px 14px;
+	border-radius: 12px;
+	border: 1px solid transparent;
+	background: var(--primary);
+	color: #fff;
+	cursor: pointer;
+	font-weight: 600;
+	transition: background-color 0.2s ease;
+}
+
+.btn:hover {
+	background: var(--primary-700);
+}
+
+.btn.secondary {
+	background: #fff;
+	color: var(--primary);
+	border-color: var(--border);
+}
+
+.btn.ghost {
+	background: transparent;
+	color: var(--primary);
+	border-color: transparent;
+}
+
+/* Form Components */
+.input {
+	width: 100%;
+	padding: 12px;
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	background: #fff;
+	transition: border-color 0.2s ease;
+}
+
+.input:focus {
+	outline: none;
+	border-color: var(--primary);
+}
+
+/* Navigation */
+nav.app {
+	display: grid;
+	grid-template-columns: 1fr auto auto auto;
+	align-items: center;
+	background: #fff;
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	padding: 10px 14px;
+}
+
+nav.app a {
+	padding: 6px 10px;
+	border-radius: 10px;
+	color: var(--muted);
+	transition: all 0.2s ease;
+}
+
+nav.app a:hover {
+	background: #f1ecfb;
+	color: var(--text);
+}
+
+/* Typography */
+h1, h2, h3 {
+	margin: 0 0 8px;
+}
+
+.subtitle {
+	color: var(--muted);
+}

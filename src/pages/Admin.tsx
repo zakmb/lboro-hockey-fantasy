@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import type { Player, TeamCode, Position } from '../types'
 import { TEAM_LABEL } from '../types'
 import { db } from '../lib/firebase'
-import { doc, getDoc, onSnapshot, setDoc, collection, updateDoc, writeBatch } from 'firebase/firestore'
+import { doc, getDoc, onSnapshot, setDoc, collection, writeBatch } from 'firebase/firestore'
 import { useAuth } from '../contexts/AuthContext'
 import { isAdmin } from '../config/adminEmails'
 
@@ -12,7 +12,6 @@ const POS: Position[] = ['GK','DEF','MID','FWD']
 export default function Admin(){
 	const { user } = useAuth()
 	
-	// Check if user has admin access
 	if (!user || !isAdmin(user.email)) {
 		return (
 			<div className="card">
@@ -22,12 +21,11 @@ export default function Admin(){
 		)
 	}
 	
-	const [transfersEnabled,setTransfersEnabled]=useState<boolean>(false)
-	const [players,setPlayers]=useState<Player[]>([])
-	const [workingPlayers,setWorkingPlayers]=useState<Player[]>([])
-	const [form,setForm]=useState<{name:string,team:TeamCode,position:Position,price:number}>({name:'',team:'Men1',position:'MID',price:4})
-	const [pendingAdds,setPendingAdds]=useState<Player[]>([])
-	const [pendingIds,setPendingIds]=useState<Set<string>>(new Set())
+	const [transfersEnabled, setTransfersEnabled] = useState<boolean>(false)
+	const [players, setPlayers] = useState<Player[]>([])
+	const [workingPlayers, setWorkingPlayers] = useState<Player[]>([])
+	const [form, setForm] = useState<{name:string,team:TeamCode,position:Position,price:number}>({name:'',team:'Men1',position:'MID',price:4})
+	const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())
 
 	useEffect(()=>{
 		const ref = doc(db,'config','league')
@@ -40,9 +38,7 @@ export default function Admin(){
 		setTransfersEnabled(v)
 		await setDoc(doc(db,'config','league'), { transfersEnabled: v }, { merge: true })
 		if (!v) {
-			// reset per-user transfer markers when window closes
 			const batch = writeBatch(db)
-			// lightweight: iterate teams snapshot and reset
 			const snap = await (await import('firebase/firestore')).getDocs(collection(db,'teams'))
 			snap.forEach(d=>{ 
 				batch.update(doc(db,'teams',d.id), { transferUsed: false })
@@ -57,7 +53,6 @@ export default function Admin(){
 			snap.forEach(d=> list.push(d.data() as Player))
 			setPlayers(list)
 			setWorkingPlayers(list)
-			setPendingAdds([])
 			setPendingIds(new Set())
 		})
 		return unsub
@@ -89,7 +84,6 @@ export default function Admin(){
 			createdAt: Date.now(),
 			updatedAt: Date.now()
 		}
-		// Write immediately. The players snapshot will refresh the list.
 		setDoc(doc(db,'players',p.id), p)
 		setForm({ name:'', team:'Men1', position:'MID', price:4 })
 	}
@@ -97,7 +91,6 @@ export default function Admin(){
 	function applyEventLocal(id:string, deltaPoints:number, mutate:(p:Player)=>Player){
 		setWorkingPlayers(prev=> prev.map(p=>{
 			if(p.id!==id) return p
-			// Coerce numeric fields to numbers to avoid NaN
 			const normalized: Player = {
 				...p,
 				pointsGw: Number(p.pointsGw)||0,
@@ -138,7 +131,6 @@ export default function Admin(){
 
 	async function finalizeGameweek(){
 		const batch = writeBatch(db)
-		// existing players updated
 		for (const p of workingPlayers){
 			const base = players.find(x=>x.id===p.id)
 			if (base){
@@ -146,7 +138,6 @@ export default function Admin(){
 				batch.update(doc(db,'players',p.id), p as any)
 			}
 		}
-		// Calculate team GW points (captain doubled) and persist to teams
 		const playerGwMap: Record<string, number> = {}
 		for (const p of workingPlayers){ playerGwMap[p.id] = Number(p.pointsGw)||0 }
 		const teamsSnap = await (await import('firebase/firestore')).getDocs(collection(db,'teams'))
@@ -156,16 +147,14 @@ export default function Admin(){
 			const captain: string|undefined = t.captainId
 			let gw = 0
 			for (const id of ids){ gw += playerGwMap[id]||0 }
-			if (captain) gw += playerGwMap[captain]||0 // captain doubled
+			if (captain) gw += playerGwMap[captain]||0
 			const prevGw = Number(t.teamPointsGw)||0
 			const total = (Number(t.teamPointsTotal)||0) + gw
 			batch.set(doc(db,'teams',d.id), { teamPrevGwPoints: prevGw, teamPointsGw: gw, teamPointsTotal: total, updatedAt: Date.now() }, { merge: true })
 		})
-		// Also roll GW -> prevGW and reset GW for all players
 		for (const p of workingPlayers){
 			batch.update(doc(db,'players',p.id), { prevGwPoints: p.pointsGw, pointsGw: 0, updatedAt: Date.now() } as any)
 		}
-		// staged new players handled by snapshot as they are immediate now
 		await batch.commit()
 		alert('Gameweek finalized and data saved')
 	}
@@ -236,7 +225,7 @@ export default function Admin(){
 				</div>
 				<div style={{display:'flex',gap:8,marginTop:12}}>
 					<button className="btn" onClick={finalizeGameweek}>Finalize Gameweek (save all)</button>
-					<button className="btn secondary" onClick={()=>{ setWorkingPlayers(players); setPendingAdds([]); setPendingIds(new Set()) }}>Discard Changes</button>
+					<button className="btn secondary" onClick={()=>{ setWorkingPlayers(players); setPendingIds(new Set()) }}>Discard Changes</button>
 				</div>
 			</div>
 		</div>

@@ -1,9 +1,7 @@
-// List of email addresses that have admin access
 export const ADMIN_EMAILS = [
   'zak26.mb@gmail.com'
 ]
 
-// Function to check if a user has admin access
 export function isAdmin(email: string | null): boolean {
   if (!email) return false
   return ADMIN_EMAILS.includes(email.toLowerCase())

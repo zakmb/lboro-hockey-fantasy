@@ -11,28 +11,26 @@ const MAX_PER_TEAM = 3
 const BUDGET_LIMIT = 100
 
 function getDeadline(): Date {
-	// Set deadline to September 6th, 2025 at midday (12:00 PM)
-	const d = new Date(2025, 8, 6, 12, 0, 0, 0) // Month is 0-indexed, so 8 = September
+	const d = new Date(2025, 8, 6, 12, 0, 0, 0) 
 	return d
 }
 
 export default function TeamBuilder(){
 	const { user } = useAuth()
 	const prevTransfersEnabledRef = useRef<boolean>(false)
-	const [pool,setPool]=useState<Player[]>([])
-	const [selected,setSelected]=useState<string[]>([])
-	const [captainId,setCaptainId]=useState<string>('')
-	const [baseline,setBaseline]=useState<string[]>([]) // team at window start or loaded from DB
-	const [baselineCaptain,setBaselineCaptain]=useState<string>('')
-	const [transfersEnabled,setTransfersEnabled]=useState<boolean>(false)
-	const [deadline,setDeadline]=useState<Date>(getDeadline())
-	const [countdown,setCountdown]=useState<string>('')
-	const [transferUsed,setTransferUsed]=useState<boolean>(false)
-	const [bank,setBank]=useState<number>(100)
-	const [buyPrices,setBuyPrices]=useState<Record<string,number>>({})
-	const [collapsedPositions,setCollapsedPositions]=useState<Record<Position,boolean>>({GK:false,DEF:false,MID:false,FWD:false})
+	const [pool, setPool] = useState<Player[]>([])
+	const [selected, setSelected] = useState<string[]>([])
+	const [captainId, setCaptainId] = useState<string>('')
+	const [baseline, setBaseline] = useState<string[]>([])
+	const [baselineCaptain, setBaselineCaptain] = useState<string>('')
+	const [transfersEnabled, setTransfersEnabled] = useState<boolean>(false)
+	const [deadline, setDeadline] = useState<Date>(getDeadline())
+	const [countdown, setCountdown] = useState<string>('')
+	const [transferUsed, setTransferUsed] = useState<boolean>(false)
+	const [bank, setBank] = useState<number>(100)
+	const [buyPrices, setBuyPrices] = useState<Record<string,number>>({})
+	const [collapsedPositions, setCollapsedPositions] = useState<Record<Position,boolean>>({GK:false,DEF:false,MID:false,FWD:false})
 
-	// Countdown
 	useEffect(()=>{
 		const timer = setInterval(()=>{
 			const now = Date.now()
@@ -47,7 +45,6 @@ export default function TeamBuilder(){
 		return ()=>clearInterval(timer)
 	},[deadline])
 
-	// Streams
 	useEffect(()=>{
 		const unsubPlayers = onSnapshot(collection(db,'players'), snap=>{
 			const list: Player[] = []
@@ -60,7 +57,6 @@ export default function TeamBuilder(){
 				const next = !!data.transfersEnabled
 				const prev = prevTransfersEnabledRef.current
 				setTransfersEnabled(next)
-				// When toggled from false -> true, reset transferUsed for all teams
 				if (prev === false && next === true){
 					try{
 						const batch = writeBatch(db)
@@ -79,7 +75,6 @@ export default function TeamBuilder(){
 		return ()=>{ unsubPlayers(); unsubConfig() }
 	},[])
 
-	// Load user's saved team
 	useEffect(()=>{
 		if(!user) return
 		const ref = doc(db,'teams',user.id)
@@ -89,7 +84,7 @@ export default function TeamBuilder(){
 			if (data?.captainId) { setCaptainId(data.captainId as string); setBaselineCaptain(data.captainId as string) }
 			if (data?.transferUsed !== undefined) setTransferUsed(!!data.transferUsed)
 			if (typeof data?.bank === 'number') setBank(data.bank)
-			else setBank(100) // Default to £100M if no bank data
+			else setBank(100)
 			if (data?.buyPrices && typeof data.buyPrices === 'object') setBuyPrices(data.buyPrices)
 		})
 		const unsub = onSnapshot(ref,(s)=>{
@@ -98,7 +93,7 @@ export default function TeamBuilder(){
 			if (data?.captainId) { setCaptainId(data.captainId as string); setBaselineCaptain(data.captainId as string) }
 			if (data?.transferUsed !== undefined) setTransferUsed(!!data.transferUsed)
 			if (typeof data?.bank === 'number') setBank(data.bank)
-			else setBank(100) // Default to £100M if no bank data
+			else setBank(100)
 			if (data?.buyPrices && typeof data.buyPrices === 'object') setBuyPrices(data.buyPrices)
 		})
 		return unsub
@@ -123,13 +118,11 @@ export default function TeamBuilder(){
 	const counts = useMemo(()=> selectedPlayers.reduce((acc,p)=>{(acc as any)[p.position]++;return acc},{GK:0,DEF:0,MID:0,FWD:0} as Record<Position,number>),[selectedPlayers])
 	const byTeam = useMemo(()=>{ const map: Record<TeamCode,number>={Men1:0,Men2:0,Men3:0,Men4:0,Men5:0}; selectedPlayers.forEach(p=>map[p.team]++); return map },[selectedPlayers])
 	const squadCost = useMemo(()=> selectedPlayers.reduce((s,p)=> s + (p.price||0), 0), [selectedPlayers])
-	const budget = BUDGET_LIMIT // Budget is always £100M, bank shows remaining funds
+	const budget = BUDGET_LIMIT
 
 	const afterDeadline = useMemo(()=> Date.now() >= deadline.getTime(), [deadline])
 
-	// Transfer limit calculation (symmetric diff/2 additions/removals)
 	const transfersUsed = useMemo(()=>{
-		// For new accounts (baseline is empty), transfersUsed should be 0
 		if (baseline.length === 0) return 0
 		const base = new Set(baseline)
 		const now = new Set(selected)
@@ -145,20 +138,16 @@ export default function TeamBuilder(){
 	const meetsFormation = (counts.GK===1 && counts.DEF===4 && counts.MID===3 && counts.FWD===3)
 	const captainValid = captainId && selected.includes(captainId)
 
-	// Post-deadline rule: if not transfersEnabled -> no edits; if enabled -> allow remaining transfer(s) + captain change
 	const deadlinePolicyOk = useMemo(()=>{
 		if (!afterDeadline) return true
-		// For new players (baseline is empty), always allow team creation after deadline
 		if (baseline.length === 0) return captainValid
 		if (!transfersEnabled) return JSON.stringify(selected.sort())===JSON.stringify(baseline.sort()) && captainValid
-		// For existing teams, check transfer limits
 		return transfersUsed <= allowedTransfersAfterDeadline && captainValid
 	},[afterDeadline,transfersEnabled,transfersUsed,allowedTransfersAfterDeadline,baseline,selected,captainValid])
 
 	const canSave = selected.length===11 && meetsTeamMin && meetsTeamMax && meetsFormation && captainValid && deadlinePolicyOk && squadCost <= budget
 	const hardDisabled = afterDeadline && !transfersEnabled && baseline.length > 0
 	
-	// Check if any changes have been made (for reset button)
 	const hasChanges = useMemo(() => {
 		const playersChanged = JSON.stringify(selected.sort()) !== JSON.stringify(baseline.sort())
 		const captainChanged = captainId !== baselineCaptain
@@ -182,7 +171,6 @@ export default function TeamBuilder(){
 	},[selected.length, byTeam, counts, captainValid, afterDeadline, transfersEnabled, transfersUsed, squadCost, budget])
 
 	function canPickByPosition(p: Player): boolean { 
-		// Check position constraints
 		const nc={...counts} as Record<Position,number>; 
 		nc[p.position]++; 
 		if(p.position==='GK'&&nc.GK>1)return false; 
@@ -190,47 +178,36 @@ export default function TeamBuilder(){
 		if(p.position==='MID'&&nc.MID>3)return false; 
 		if(p.position==='FWD'&&nc.FWD>3)return false; 
 		
-		// Check team constraints
 		const currentByTeam = {...byTeam}
 		currentByTeam[p.team]++
 		if (currentByTeam[p.team] > MAX_PER_TEAM) return false
 		
-		// Check budget constraints
 		const newSquadCost = squadCost + p.price
 		if (newSquadCost > budget) return false
 		
-		// Check total players
 		return selected.length < 11
 	}
 
 	function toggle(id:string, e: React.MouseEvent){ 
-		e.preventDefault() // Prevent page scroll
-		e.stopPropagation() // Prevent event bubbling
+		e.preventDefault()
+		e.stopPropagation()
 		const p=pool.find(x=>x.id===id)!; 
 		if(selected.includes(id)){ 
-			// Prevent deselecting players when transfers are disabled or used up
-			// For new accounts (baseline empty), always allow deselecting
 			if (baseline.length === 0) {
-				// Allow deselecting for new accounts
 			} else if (hardDisabled || (afterDeadline && transfersEnabled && transferUsed)) {
 				return
 			}
 			setSelected(prev=>prev.filter(x=>x!==id)); 
 			if(captainId===id) setCaptainId(''); 
-			// Add player's price back to bank when removing
 			setBank(prev => prev + p.price)
 			return 
 		}
-		// Prevent picking beyond window rules (after deadline, transfers enabled, only 1 transfer)
 		if (canPickByPosition(p)) {
 			const simulate = [...selected, id]
 			if (afterDeadline) {
-				// For new accounts (baseline is empty), always allow full team creation
 				if (baseline.length === 0) {
-					// Allow adding players up to 11 for new accounts
 					if (simulate.length > 11) return
 				} else if (transfersEnabled) {
-					// For existing teams, apply transfer limits
 					const base = new Set(baseline)
 					let diff = 0
 					for (const pid of simulate) if (!base.has(pid)) diff++
@@ -238,11 +215,9 @@ export default function TeamBuilder(){
 					const used = Math.ceil(diff/2)
 					if (used>1) return
 				} else {
-					// Transfers not enabled, no changes allowed for existing teams
 					return
 				}
 			}
-			// Subtract player's price from bank when adding
 			setBank(prev => prev - p.price)
 			setSelected(prev=>[...prev,id])
 		}
@@ -251,43 +226,37 @@ export default function TeamBuilder(){
 	async function saveTeam(){
 		if(!user||!canSave) return;
 		
-		let nextBank = bank // Start with current bank balance
+		let nextBank = bank
 		let nextBuy = { ...buyPrices }
 		
-		// On first-time team creation, initialize buyPrices
 		if (baseline.length===0 && selected.length===11){
 			for (const p of selectedPlayers){ 
 				nextBuy[p.id] = p.price 
-				// Don't subtract from bank - it's already correct from player selection
 			}
 		} else {
-			// For team changes, handle player replacements
 			const baseSet = new Set(baseline)
 			const nowSet = new Set(selected)
 			
-			// Remove old players and add their current price back to budget
 			for (const removed of baseline){ 
 				if (!nowSet.has(removed)){
 					const p = pool.find(x=>x.id===removed)
 					if (p){ 
-						nextBank += p.price // Add current price back to budget
+						nextBank += p.price
 						delete nextBuy[removed] 
 					}
 				}
 			}
 			
-			// Add new players and subtract their current price from budget
 			for (const added of selected){ 
 				if (!baseSet.has(added)){
 					const p = pool.find(x=>x.id===added)
 					if (p){ 
 						nextBuy[added] = p.price 
-						nextBank -= p.price // Subtract current price from budget
+						nextBank -= p.price
 					}
 				}
 			}
 			
-			// Ensure bank doesn't go below 0
 			nextBank = Math.max(0, nextBank)
 		}
 		
@@ -298,12 +267,11 @@ export default function TeamBuilder(){
 			players: selected, 
 			captainId, 
 			bank: parseFloat(nextBank.toFixed(1)), 
-			budget: BUDGET_LIMIT, // Save the total budget (100M)
+			budget: BUDGET_LIMIT,
 			buyPrices: nextBuy, 
 			updatedAt: Date.now() 
 		}
 		
-		// Add createdAt only for first-time team creation
 		if (baseline.length===0 && selected.length===11) {
 			payload.createdAt = Date.now()
 		}
@@ -316,7 +284,6 @@ export default function TeamBuilder(){
 	function resetTeam(){ 
 		setSelected(baseline); 
 		setCaptainId(baselineCaptain)
-		// Reset bank to original state
 		let originalBank = 100
 		for (const playerId of baseline) {
 			const p = pool.find(x => x.id === playerId)
