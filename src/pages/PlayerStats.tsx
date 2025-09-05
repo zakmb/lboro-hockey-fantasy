@@ -74,6 +74,16 @@ export default function PlayerStats() {
 		return sortDirection === 'asc' ? '↑' : '↓'
 	}
 
+	function getPositionStyle(position: string) {
+		const styles = {
+			GK: { bg: '#fef3c7', color: '#92400e' },
+			DEF: { bg: '#dbeafe', color: '#1e40af' },
+			MID: { bg: '#d1fae5', color: '#065f46' },
+			FWD: { bg: '#fce7f3', color: '#be185d' }
+		}
+		return styles[position as keyof typeof styles] || styles.FWD
+	}
+
 	if (loading) {
 		return (
 			<div className="card">
@@ -323,12 +333,7 @@ export default function PlayerStats() {
 										borderRadius: '12px',
 										fontSize: '11px',
 										fontWeight: '600',
-										background: player.position === 'GK' ? '#fef3c7' : 
-													player.position === 'DEF' ? '#dbeafe' : 
-													player.position === 'MID' ? '#d1fae5' : '#fce7f3',
-										color: player.position === 'GK' ? '#92400e' : 
-												player.position === 'DEF' ? '#1e40af' : 
-												player.position === 'MID' ? '#065f46' : '#be185d'
+										...getPositionStyle(player.position)
 									}}>
 										{player.position}
 									</span>

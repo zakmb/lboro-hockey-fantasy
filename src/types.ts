@@ -1,7 +1,7 @@
 export type TeamCode = 'Men1' | 'Men2' | 'Men3' | 'Men4' | 'Men5'
 export type Position = 'GK' | 'DEF' | 'MID' | 'FWD'
 
-export const TEAM_LABEL: Record<TeamCode,string> = {
+export const TEAM_LABEL: Record<TeamCode, string> = {
 	Men1: "Men's 1s",
 	Men2: "Men's 2s",
 	Men3: "Men's 3s",
