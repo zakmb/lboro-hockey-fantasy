@@ -1,0 +1,271 @@
+/* File: C:\Users\samj9\LSMHC-Fantasy-Team\lboro-hockey-fantasy\src\pages\TeamBuilder.css */
+
+/* =======================
+   Imports & Page Defaults
+   ======================= */
+@import url('../index.css');
+
+body { background: #f6f7fb; }
+
+/* =======================
+   Layout
+   ======================= */
+.layout{
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  padding: 12px clamp(8px, 3vw, 20px) 80px;
+  align-items: start;
+  min-height: 100vh;
+}
+@media (min-width: 1024px){
+  .layout{ grid-template-columns: 1fr 1.1fr; gap: 24px; padding-bottom: 24px; }
+}
+
+.left, .right{ display: grid; gap: 12px; }
+@media (min-width: 640px){ .left, .right{ gap: 16px; } }
+@media (min-width: 1024px){ .left, .right{ gap: 24px; } }
+
+/* =======================
+   Cards & Common Elements
+   ======================= */
+.card { 
+  border-radius: var(--radius, 12px); 
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.06)); 
+}
+.subtitle{ color: var(--muted); font-size: .92rem; }
+
+.actions{ display:flex; flex-wrap:wrap; gap:8px; }
+.sticky-actions{
+  position: sticky;
+  bottom: 8px;
+  padding-top: 8px;
+  background: var(--surface);
+}
+
+/* Optional alt button style */
+.btn--secondaryAlt{ 
+  background: #eef2ff; 
+  color:#3730a3; 
+  box-shadow: var(--shadow, 0 2px 6px rgba(0,0,0,0.08)); 
+}
+.btn--secondaryAlt:disabled{ opacity:.5; cursor:not-allowed; }
+.btn--secondaryAlt:not(:disabled):active{ 
+  transform: translateY(1px); 
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.06)); 
+}
+
+/* =======================
+   Notices & Errors
+   ======================= */
+.notice{ border-color:#e9d5ff; background:#faf5ff; color:#6b21a8; }
+.notice.notice--purple{ border:1px solid #e9d5ff; }
+
+.errors{ 
+  margin-bottom:12px; 
+  padding:12px; 
+  border:1px solid #f5c2c7; 
+  background:#fff0f1; 
+  border-radius:10px; 
+  color:#7f1d1d; 
+}
+.errors ul{ margin: 8px 0 0 18px; }
+
+/* =======================
+   Position Lists (Pickers)
+   ======================= */
+.pos-header{
+  width: 100%;
+  display:flex; 
+  justify-content:space-between; 
+  align-items:center; 
+  cursor:pointer; 
+  margin: 0 0 12px 0; 
+  background: transparent; 
+  border:0; 
+  padding:0;
+}
+.pos-header.collapsed{ margin-bottom: 0; }
+.pos-title{ margin:0; font-size:1.05rem; display:flex; gap:.5ch; align-items: baseline; }
+.pos-count{ color: var(--muted); font-weight: 600; font-size: .95rem; }
+.caret{ font-size: 18px; font-weight: 700; color: var(--primary); transition: transform .2s ease; display:inline-block; }
+.pos-header:not(.collapsed) .caret{ transform: rotate(180deg); }
+
+.players-grid{ 
+  display:grid; 
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); 
+  gap: 10px; 
+  align-items: stretch; 
+}
+@media (min-width: 640px){ 
+  .players-grid{ grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; } 
+}
+
+/* =======================
+   Player Card (Picker list)
+   ======================= */
+.player-card{
+  display:grid; 
+  grid-template-columns: 56px 1fr; 
+  gap: 12px; 
+  align-items:stretch;
+  transition: box-shadow .2s ease, transform .2s ease, border-color .2s ease, background .2s ease, opacity .2s ease;
+  cursor: pointer; 
+  user-select: none; 
+  min-height: 110px; 
+  overflow: hidden;
+}
+.player-card.is-selected{
+  border-color: var(--primary); 
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  background: linear-gradient(135deg, #f0f9ff, #e0f2fe); 
+  transform: translateY(-2px);
+}
+.player-card.is-disabled{ opacity: .6; cursor: not-allowed; }
+
+.player-stat{ 
+  text-align:center; 
+  background: var(--surface-2, #f8fafc); 
+  border-radius: 8px; 
+  padding: 12px 8px; 
+  min-width: 50px; 
+  display:flex; 
+  flex-direction:column; 
+  justify-content:center; 
+  align-items:center; 
+}
+.player-stat.is-selected{ background: var(--primary); color:#fff; }
+.stat-big{ font-weight:700; font-size: 16px; }
+.stat-label{ font-size:10px; opacity:.8; font-weight:500; margin-top:2px; }
+.stat-sub{ font-size:11px; opacity:.8; font-weight:500; margin-top:4px; }
+
+.player-meta{ min-width:0; display:flex; flex-direction:column; justify-content:center; overflow:hidden; }
+.player-name{ font-weight:700; font-size:14px; color:var(--text); margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.2; }
+.player-team{ font-size:12px; color: var(--muted); font-weight:500; line-height:1.3; margin-bottom:4px; }
+.player-price{ font-size:13px; color:#059669; font-weight:800; line-height:1.2; }
+
+/* =======================
+   Pitch Container
+   ======================= */
+.card.pitch{ 
+  background: var(--primary); 
+  border-color: var(--primary);
+  color: var(--surface);
+  max-width: clamp(260px, 96vw, 960px);
+  margin-inline: auto;
+
+  /* global responsive vars, set by JS on .pitch */
+  --chip-max-global: none;
+  --font-scale-global: 1;
+}
+.pitch-rows{ display:grid; gap: 14px; }
+.spacer-12{ height: 12px; }
+.card-title-row{ color: var(--surface); display:flex; align-items:center; justify-content:space-between; gap: 8px; flex-wrap: wrap; }
+.badge-time{ background:#ecfeff; color:#155e75; padding:6px 10px; border-radius:999px; font-size:.82rem; border:1px solid #cffafe; }
+
+/* =======================
+   Fixed Formation Rows (1–4–3–3)
+   ======================= */
+.row{
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(clamp(70px, 16vw, 160px), 1fr));
+  justify-content: center;
+  justify-items: center; /* center chips so max-width cap is visible */
+  gap: 10px;
+
+  /* per-row defaults if needed */
+  --chip-max: none;
+  --font-scale: 1;
+}
+@media (min-width: 640px){
+  .row{
+    grid-template-columns: repeat(var(--cols), minmax(clamp(80px, 12vw, 180px), 1fr));
+    gap: 12px;
+  }
+}
+
+/* =======================
+   Chips on the Pitch (Responsive)
+   ======================= */
+.chip{ 
+  position: relative; 
+  text-align: center; 
+  width: 100%;
+  min-width: 0;
+  /* cap to global smallest column; fall back to row cap */
+  max-width: var(--chip-max-global, var(--chip-max));
+  /* readable dark text by default (pitch container had light text) */
+  color: var(--text);
+
+  padding: calc(var(--font-scale-global) * var(--font-scale) * clamp(8px, 1.8vw, 12px)) 
+           calc(var(--font-scale-global) * var(--font-scale) * clamp(8px, 1.6vw, 10px));
+
+  flex-shrink: 0;
+}
+.chip--sm{
+  padding: calc(var(--font-scale-global) * var(--font-scale) * clamp(6px, 1.4vw, 10px)) 
+           calc(var(--font-scale-global) * var(--font-scale) * clamp(6px, 1.2vw, 8px));
+}
+
+.captain{ 
+  position: absolute; 
+  top: 6px; 
+  right: 6px; 
+  background: var(--primary); 
+  color: #fff; 
+  border-radius: 999px; 
+  padding: 2px 6px; 
+  font-size: 11px; 
+  font-weight: 700; 
+}
+
+/* Typography scales globally and per-row */
+.chip,
+.chip * { font-size: calc(1em * var(--font-scale-global) * var(--font-scale)); }
+
+/* Player name in PRIMARY as requested */
+.chip-name{ 
+  font-weight: 700; 
+  color: var(--primary);
+  font-size: calc(var(--font-scale-global) * var(--font-scale) * clamp(11px, 1.8vw, 13px));
+  line-height: 1.2; 
+  margin-bottom: 4px; 
+  white-space: nowrap; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+}
+.chip-name--sm{ font-size: calc(var(--font-scale-global) * var(--font-scale) * clamp(10px, 1.6vw, 12px)); }
+.chip-pos{ font-size: calc(var(--font-scale-global) * var(--font-scale) * clamp(10px, 1.6vw, 11px)); margin-bottom: 4px; }
+.chip-prev{ font-size: calc(var(--font-scale-global) * var(--font-scale) * clamp(10px, 1.6vw, 11px)); color: var(--muted); }
+
+/* Placeholders */
+.chip--empty{
+  background: rgba(255,255,255,0.2);
+  border: 1px dashed rgba(255,255,255,0.5);
+}
+.chip-placeholder{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.7;
+}
+.chip-placeholder-dot{
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.7);
+}
+
+/* =======================
+   Budget Block (Right column)
+   ======================= */
+.budget-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.budget-amount{ font-weight:800; letter-spacing:.2px; }
+.label{ display:block; margin-bottom: 6px; }
+
+/* =======================
+   Tiny Screens Tweaks
+   ======================= */
+@media (max-width: 380px){
+  .layout{ padding-left: 8px; padding-right: 8px; }
+}
