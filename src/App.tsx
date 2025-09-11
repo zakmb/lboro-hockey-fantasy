@@ -1,6 +1,7 @@
 import React from 'react'
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { InjuriesProvider } from './contexts/InjuriesContext'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import TeamBuilder from './pages/TeamBuilder'
@@ -156,8 +157,9 @@ export default function App() {
   return (
     <>
       <AuthProvider>
-        <Shell>
-          <Routes>
+        <InjuriesProvider>
+          <Shell>
+            <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/" element={<Navigate to="/team" replace />} />
@@ -166,8 +168,9 @@ export default function App() {
             <Route path="/stats" element={<Protected><PlayerStats /></Protected>} />
             <Route path="/admin" element={<Protected><Admin /></Protected>} />
             <Route path="*" element={<Navigate to="/team" replace />} />
-          </Routes>
-        </Shell>
+            </Routes>
+          </Shell>
+        </InjuriesProvider>
       </AuthProvider>
 
       {/* ===== Local styles appended at end of file as requested ===== */}

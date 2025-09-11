@@ -5,6 +5,7 @@ import { db } from '../lib/firebase'
 import { collection, onSnapshot, doc, setDoc, getDoc, getDocs, writeBatch } from 'firebase/firestore'
 import { useAuth } from '../contexts/AuthContext'
 import './TeamBuilder.css'
+import { useInjuries } from '../contexts/InjuriesContext'
 
 const TEAMS: TeamCode[] = ['Men1','Men2','Men3','Men4','Men5']
 const FORMATION = { GK: 1, DEF: 4, MID: 3, FWD: 3 } as const
@@ -18,6 +19,7 @@ function getDeadline(): Date {
 
 export default function TeamBuilder(){
   const { user } = useAuth()
+  const { isInjured } = useInjuries()
   const prevTransfersEnabledRef = useRef<boolean>(false)
   const [pool, setPool] = useState<Player[]>([])
   const [selected, setSelected] = useState<string[]>([])
@@ -327,7 +329,7 @@ export default function TeamBuilder(){
                     <div className="stat-sub">Prev GW {p.prevGwPoints}</div>
                   </div>
                   <div className="player-meta">
-                    <div className="player-name">{p.name}</div>
+                    <div className="player-name">{p.name}{isInjured(p.id) ? ' 🚑' : ''}</div>
                     <div className="player-team">{TEAM_LABEL[p.team]}</div>
                     <div className="player-price">£{p.price}M</div>
                   </div>
@@ -430,7 +432,7 @@ export default function TeamBuilder(){
           return (
             <div key={p.id} className={`card chip ${isDefenders ? 'chip--sm' : ''}`}>
               {captainId===p.id && (<div className="captain">C</div>)}
-              <div className={`chip-name ${isDefenders ? 'chip-name--sm' : ''}`}>{p.name}</div>
+              <div className={`chip-name ${isDefenders ? 'chip-name--sm' : ''}`}>{p.name}{isInjured(p.id) ? ' 🚑' : ''}</div>
               <div className="subtitle chip-pos">{p.position}</div>
               <div className="chip-prev">Prev GW: {p.prevGwPoints}</div>
             </div>
@@ -468,7 +470,7 @@ export default function TeamBuilder(){
           <label className="subtitle label" htmlFor="captain">Captain</label>
           <select id="captain" className="input" value={captainId} onChange={e=>setCaptainId(e.target.value)}>
             <option value="">Select your captain</option>
-            {selectedPlayers.map(p=> <option key={p.id} value={p.id}>{p.name} — {p.position}</option>)}
+            {selectedPlayers.map(p=> <option key={p.id} value={p.id}>{p.name}{isInjured(p.id) ? ' 🚑' : ''} — {p.position}</option>)}
           </select>
         </div>
 

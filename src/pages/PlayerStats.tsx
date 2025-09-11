@@ -3,6 +3,7 @@ import { db } from '../lib/firebase'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { TEAM_LABEL } from '../types'
 import type { Player } from '../types'
+import { useInjuries } from '../contexts/InjuriesContext'
 
 type SortField = 'name' | 'team' | 'position' | 'pointsTotal' | 'prevGwPoints' | 'goals' | 'assists' | 'cleanSheets' | 'greenCards' | 'yellowCards' | 'redCards' | 'price'
 type SortDirection = 'asc' | 'desc'
@@ -12,6 +13,7 @@ export default function PlayerStats() {
 	const [loading, setLoading] = useState(true)
 	const [sortField, setSortField] = useState<SortField>('pointsTotal')
 	const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+	const { isInjured } = useInjuries()
 
 	useEffect(() => {
 		const unsub = onSnapshot(collection(db, 'players'), (snapshot) => {
@@ -322,7 +324,7 @@ export default function PlayerStats() {
 								borderBottom: '1px solid #e5e7eb'
 							}}>
 								<td style={{ padding: '12px', fontWeight: '600' }}>
-									{player.name}
+									{player.name}{isInjured(player.id) ? ' 🚑' : ''}
 								</td>
 								<td style={{ padding: '12px', textAlign: 'center' }}>
 									{TEAM_LABEL[player.team]}

@@ -5,12 +5,14 @@ import { db } from '../lib/firebase'
 import { doc, getDoc, onSnapshot, setDoc, collection, writeBatch } from 'firebase/firestore'
 import { useAuth } from '../contexts/AuthContext'
 import { isAdmin } from '../config/adminEmails'
+import { useInjuries } from '../contexts/InjuriesContext'
 
 const TEAMS: TeamCode[] = ['Men1','Men2','Men3','Men4','Men5']
 const POS: Position[] = ['GK','DEF','MID','FWD']
 
 export default function Admin(){
 	const { user } = useAuth()
+	const { injuredIds, isInjured, markInjured, clearInjured } = useInjuries()
 	
 	if (!user || !isAdmin(user.email)) {
 		return (
@@ -27,6 +29,7 @@ export default function Admin(){
 	const [form, setForm] = useState<{name:string,team:TeamCode,position:Position,price:number}>({name:'',team:'Men1',position:'MID',price:4})
 	const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())
 	const [gwChanges, setGwChanges] = useState<Record<string, {goals: number, assists: number, cleanSheets: number, greenCards: number, yellowCards: number, redCards: number}>>({})
+	const [injurySelectId, setInjurySelectId] = useState<string>('')
 
 	useEffect(()=>{
 		const ref = doc(db,'config','league')
@@ -264,6 +267,32 @@ export default function Admin(){
 			</div>
 
 			<div className="card">
+				<h3>Injuries</h3>
+				<div className="grid" style={{gridTemplateColumns:'2fr 1fr'}}>
+					<select className="input" value={injurySelectId} onChange={e=>setInjurySelectId(e.target.value)}>
+						<option value="">Select player to mark injured</option>
+						{players.filter(p=>!injuredIds.has(p.id)).sort((a,b)=>a.name.localeCompare(b.name)).map(p=> (
+							<option key={p.id} value={p.id}>{p.name}</option>
+						))}
+					</select>
+					<button className="btn" disabled={!injurySelectId} onClick={async()=>{ if(!injurySelectId) return; await markInjured(injurySelectId); setInjurySelectId('') }}>Mark Injured</button>
+				</div>
+				<div style={{height:8}}/>
+				<div className="grid" style={{gridTemplateColumns:'1fr'}}>
+					<div className="subtitle">Currently Injured</div>
+					{players.filter(p=>injuredIds.has(p.id)).length===0 && (
+						<div>No injured players.</div>
+					)}
+					{players.filter(p=>injuredIds.has(p.id)).sort((a,b)=>a.name.localeCompare(b.name)).map(p=> (
+						<div key={p.id} className="card" style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+							<div className="text-sm">{p.name} 🚑</div>
+							<button className="btn secondary" onClick={()=>clearInjured(p.id)}>Remove</button>
+						</div>
+					))}
+				</div>
+			</div>
+
+			<div className="card">
 				<h3>Players (by team)</h3>
 				<div className="grid" style={{gridTemplateColumns:'1fr'}}>
 					{TEAMS.map(team => (
@@ -284,7 +313,7 @@ export default function Admin(){
 													<div className="card-header">
 														<div>
 															<div className="text-title-sm">
-																{p.name}
+																{p.name}{isInjured(p.id) ? ' 🚑' : ''}
 															</div>
 															<div className="text-sm text-muted">
 																£{p.price}M • {pos} • GW: {p.pointsGw} • Total: {p.pointsTotal}
