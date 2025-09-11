@@ -218,12 +218,16 @@ export default function Admin(){
 				const t = d.data() as any
 				const ids: string[] = Array.isArray(t.players)? t.players : []
 				const captain: string|undefined = t.captainId
+				const triplePending: boolean = !!t.tripleCaptainPending
 				let gw = 0
 				for (const id of ids){ gw += playerGwMap[id]||0 }
-				if (captain) gw += playerGwMap[captain]||0
-				const prevGw = Number(t.teamPointsGw)||0
+				if (captain) {
+					const capPts = playerGwMap[captain]||0
+					gw += capPts
+					if (triplePending) gw += capPts
+				}
 				const total = (Number(t.teamPointsTotal)||0) + gw
-				batch.set(doc(db,'teams',d.id), { teamPrevGwPoints: prevGw, teamPointsGw: gw, teamPointsTotal: total, updatedAt: Date.now() }, { merge: true })
+				batch.set(doc(db,'teams',d.id), { teamPrevGwPoints: gw, teamPointsTotal: total, updatedAt: Date.now(), ...(triplePending? { tripleCaptainPending: false, tripleCaptainUsed: true } : {}) }, { merge: true })
 			})
 			
 			// Reset gameweek changes and points

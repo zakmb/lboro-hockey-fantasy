@@ -33,6 +33,9 @@ export default function TeamBuilder(){
   const [bank, setBank] = useState<number>(100)
   const [buyPrices, setBuyPrices] = useState<Record<string,number>>({})
   const [collapsedPositions, setCollapsedPositions] = useState<Record<Position,boolean>>({GK:false,DEF:false,MID:false,FWD:false})
+  const [tripleCaptainUsed, setTripleCaptainUsed] = useState<boolean>(false)
+  const [tripleCaptainPending, setTripleCaptainPending] = useState<boolean>(false)
+  const [tripleCaptainConfirm, setTripleCaptainConfirm] = useState<boolean>(false)
 
   // countdown
   useEffect(()=>{
@@ -92,6 +95,8 @@ export default function TeamBuilder(){
       if (typeof data?.bank === 'number') setBank(data.bank)
       else setBank(100)
       if (data?.buyPrices && typeof data.buyPrices === 'object') setBuyPrices(data.buyPrices)
+      if (data?.tripleCaptainUsed !== undefined) setTripleCaptainUsed(!!data.tripleCaptainUsed)
+      if (data?.tripleCaptainPending !== undefined) setTripleCaptainPending(!!data.tripleCaptainPending)
     })
     const unsub = onSnapshot(ref,(s)=>{
       const data = s.data() as any
@@ -101,6 +106,8 @@ export default function TeamBuilder(){
       if (typeof data?.bank === 'number') setBank(data.bank)
       else setBank(100)
       if (data?.buyPrices && typeof data.buyPrices === 'object') setBuyPrices(data.buyPrices)
+      if (data?.tripleCaptainUsed !== undefined) setTripleCaptainUsed(!!data.tripleCaptainUsed)
+      if (data?.tripleCaptainPending !== undefined) setTripleCaptainPending(!!data.tripleCaptainPending)
     })
     return unsub
   },[user])
@@ -267,6 +274,8 @@ export default function TeamBuilder(){
       bank: parseFloat(nextBank.toFixed(1)),
       budget: BUDGET_LIMIT,
       buyPrices: nextBuy,
+      tripleCaptainUsed,
+      tripleCaptainPending,
       updatedAt: Date.now()
     }
 
@@ -466,6 +475,37 @@ export default function TeamBuilder(){
           <div className="budget-row">
             <div className="subtitle">Budget</div>
             <div className="budget-amount" aria-live="polite">£{bank.toFixed(1)}M</div>
+          </div>
+          <div className="grid" style={{gridTemplateColumns:'1fr auto', alignItems:'center'}}>
+            <div className="subtitle">Triple Captain</div>
+            {tripleCaptainUsed ? (
+              <button className="btn secondary" disabled title="Already used">Used</button>
+            ) : tripleCaptainPending ? (
+              <button className="btn secondary" disabled title="Will apply on next scoring">Activated</button>
+            ) : tripleCaptainConfirm ? (
+              <button
+                className="btn"
+                disabled={!captainValid}
+                title={!captainValid ? 'Select a captain first' : 'Confirm triple captain for next scoring'}
+                onClick={async ()=>{
+                  if (!captainValid || !user) return
+                  setTripleCaptainPending(true)
+                  setTripleCaptainConfirm(false)
+                  await setDoc(doc(db,'teams',user.id), { tripleCaptainPending: true }, { merge: true })
+                }}
+              >
+                Confirm?
+              </button>
+            ) : (
+              <button
+                className="btn"
+                disabled={!captainValid}
+                title={!captainValid ? 'Select a captain first' : 'Triples next scoring for your captain'}
+                onClick={()=> setTripleCaptainConfirm(true)}
+              >
+                Activate?
+              </button>
+            )}
           </div>
           <label className="subtitle label" htmlFor="captain">Captain</label>
           <select id="captain" className="input" value={captainId} onChange={e=>setCaptainId(e.target.value)}>
