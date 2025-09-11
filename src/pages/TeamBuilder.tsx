@@ -137,8 +137,6 @@ export default function TeamBuilder(){
   },[baseline,selected])
 
   const allowedTransfersAfterDeadline = transferUsed ? 0 : 1
-  const meetsTeamMin = TEAMS.every(t=>byTeam[t]>=1)
-  const meetsTeamMax = TEAMS.every(t=>byTeam[t] <= MAX_PER_TEAM)
   const meetsFormation = (counts.GK===1 && counts.DEF===4 && counts.MID===3 && counts.FWD===3)
   const captainValid = captainId && selected.includes(captainId)
 
@@ -149,7 +147,7 @@ export default function TeamBuilder(){
     return transfersUsed <= allowedTransfersAfterDeadline && captainValid
   },[afterDeadline,transfersEnabled,transfersUsed,allowedTransfersAfterDeadline,baseline,selected,captainValid])
 
-  const canSave = selected.length===11 && meetsTeamMin && meetsTeamMax && meetsFormation && captainValid && deadlinePolicyOk && squadCost <= budget
+  const canSave = selected.length===11 && meetsFormation && captainValid && deadlinePolicyOk && squadCost <= budget
   const hardDisabled = afterDeadline && !transfersEnabled && baseline.length > 0
 
   const hasChanges = useMemo(() => {
@@ -161,8 +159,6 @@ export default function TeamBuilder(){
   const errorMessages = useMemo(()=>{
     const errs: string[] = []
     if (selected.length !== 11) errs.push('You must select exactly 11 players.')
-    TEAMS.forEach(t=>{ if(byTeam[t] < 1) errs.push(`Select at least 1 player from ${TEAM_LABEL[t]}.`) })
-    TEAMS.forEach(t=>{ if(byTeam[t] > 3) errs.push(`Maximum 3 from ${TEAM_LABEL[t]} (currently ${byTeam[t]}).`) })
     if (counts.GK !== 1) errs.push('You must pick exactly 1 Goalkeeper.')
     if (counts.DEF !== 4) errs.push('You must pick exactly 4 Defenders.')
     if (counts.MID !== 3) errs.push('You must pick exactly 3 Midfielders.')
@@ -170,9 +166,9 @@ export default function TeamBuilder(){
     if (!captainValid) errs.push('Select a captain from your 11 players.')
     if (afterDeadline && !transfersEnabled && baseline.length > 0) errs.push('Transfer window closed. No changes allowed.')
     if (afterDeadline && transfersEnabled && baseline.length > 0 && transfersUsed>1) errs.push('Only 1 transfer allowed while transfers are enabled.')
-    if (squadCost > budget) errs.push(`Budget exceeded: £${squadCost.toFixed(1)}M / £{budget.toFixed(1)}M`)
+    if (squadCost > budget) errs.push(`Budget exceeded: £${squadCost.toFixed(1)}M / £${budget.toFixed(1)}M`)
     return errs
-  },[selected.length, byTeam, counts, captainValid, afterDeadline, transfersEnabled, transfersUsed, squadCost, budget])
+  },[selected.length, counts, captainValid, afterDeadline, transfersEnabled, transfersUsed, squadCost, budget])
 
   function canPickByPosition(p: Player): boolean {
     const nc={...counts} as Record<Position,number>
@@ -181,10 +177,6 @@ export default function TeamBuilder(){
     if(p.position==='DEF'&&nc.DEF>4)return false
     if(p.position==='MID'&&nc.MID>3)return false
     if(p.position==='FWD'&&nc.FWD>3)return false
-
-    const currentByTeam = {...byTeam}
-    currentByTeam[p.team]++
-    if (currentByTeam[p.team] > MAX_PER_TEAM) return false
 
     const newSquadCost = squadCost + p.price
     if (newSquadCost > budget) return false

@@ -122,3 +122,78 @@ h1, h2, h3 {
 .subtitle {
 	color: var(--muted);
 }
+
+/* Content helpers */
+.card-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	margin-bottom: 16px;
+	padding-bottom: 12px;
+	border-bottom: 1px solid var(--border);
+}
+
+.text-title-sm {
+	font-size: 16px;
+	font-weight: 700;
+	color: var(--text);
+	margin-bottom: 4px;
+}
+
+.text-sm {
+	font-size: 14px;
+}
+
+.text-muted {
+	color: var(--muted);
+}
+
+.fields-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+	gap: 16px;
+	align-items: start;
+}
+
+/* Card variants */
+.card.primary {
+	background: var(--primary);
+	border-color: var(--primary);
+	color: var(--surface);
+}
+
+.card.section {
+	padding: 16px;
+}
+
+.card.inner {
+	padding: 18px;
+	width: 100%;
+	background: var(--surface);
+	border-color: var(--border);
+	color: var(--text);
+	box-shadow: 0 10px 24px rgba(92, 45, 145, 0.06);
+}
+
+/* Form helpers */
+.field-label {
+	display: block;
+	margin-bottom: 6px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--muted);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.checkbox-tile {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 12px;
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	background: #fff;
+	cursor: pointer;
+	transition: border-color 0.2s ease;
+}

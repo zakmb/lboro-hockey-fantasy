@@ -26,6 +26,7 @@ export default function Admin(){
 	const [workingPlayers, setWorkingPlayers] = useState<Player[]>([])
 	const [form, setForm] = useState<{name:string,team:TeamCode,position:Position,price:number}>({name:'',team:'Men1',position:'MID',price:4})
 	const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())
+	const [gwChanges, setGwChanges] = useState<Record<string, {goals: number, assists: number, cleanSheets: number, greenCards: number, yellowCards: number, redCards: number}>>({})
 
 	useEffect(()=>{
 		const ref = doc(db,'config','league')
@@ -35,6 +36,7 @@ export default function Admin(){
 	},[])
 
 	async function toggleTransfers(v:boolean){
+		try {
 		setTransfersEnabled(v)
 		await setDoc(doc(db,'config','league'), { transfersEnabled: v }, { merge: true })
 		if (!v) {
@@ -44,6 +46,10 @@ export default function Admin(){
 				batch.update(doc(db,'teams',d.id), { transferUsed: false })
 			})
 			await batch.commit()
+			}
+		} catch (error) {
+			console.error('Error toggling transfers:', error)
+			alert(`Failed to update transfers: ${error instanceof Error ? error.message : 'Unknown error'}. Please check your Firebase permissions.`)
 		}
 	}
 
@@ -65,49 +71,88 @@ export default function Admin(){
 		return { ...player, price: newPrice }
 	}
 
-	function addPlayerLocal(){
-		const p: Player = {
-			id: crypto.randomUUID(),
-			name: form.name || 'New Player',
-			team: form.team,
-			position: form.position,
-			price: form.price,
-			pointsTotal: 0,
-			pointsGw: 0,
-			prevGwPoints: 0,
-			goals: 0,
-			assists: 0,
-			cleanSheets: 0,
-			greenCards: 0,
-			yellowCards: 0,
-			redCards: 0,
-			createdAt: Date.now(),
-			updatedAt: Date.now()
+	async function addPlayerLocal(){
+		try {
+            const p: Player = {
+                id: crypto.randomUUID(),
+                name: form.name || 'New Player',
+                team: form.team,
+                position: form.position,
+                price: form.price,
+                pointsTotal: 0,
+                pointsGw: 0,
+                prevGwPoints: 0,
+                goals: 0,
+                assists: 0,
+                cleanSheets: 0,
+                greenCards: 0,
+                yellowCards: 0,
+                redCards: 0,
+                createdAt: Date.now(),
+                updatedAt: Date.now()
+            }
+
+            await setDoc(doc(db,'players',p.id), p)
+            setForm({ name:'', team:'Men1', position:'MID', price:4 })
+
+			alert('Player added successfully!')
+		} catch (error) {
+			console.error('Error adding player:', error)
+			alert(`Failed to add player: ${error instanceof Error ? error.message : 'Unknown error'}. Please check your Firebase permissions.`)
 		}
-		setDoc(doc(db,'players',p.id), p)
-		setForm({ name:'', team:'Men1', position:'MID', price:4 })
 	}
 
-	function applyEventLocal(id:string, deltaPoints:number, mutate:(p:Player)=>Player){
-		setWorkingPlayers(prev=> prev.map(p=>{
-			if(p.id!==id) return p
-			const normalized: Player = {
+	function calculatePoints(player: Player, changes: {goals: number, assists: number, cleanSheets: number, greenCards: number, yellowCards: number, redCards: number}): number {
+		let points = 0
+		
+		// Goals (position dependent)
+		if (player.position === 'DEF') points += changes.goals * 6
+		else if (player.position === 'MID' || player.position === 'FWD') points += changes.goals * 5
+		
+		// Assists
+		points += changes.assists * 3
+		
+		// Clean sheets (position dependent)
+		if (player.position === 'GK') points += changes.cleanSheets * 6
+		else if (player.position === 'DEF') points += changes.cleanSheets * 4
+		else if (player.position === 'MID') points += changes.cleanSheets * 2
+		
+		// Cards
+		points += changes.greenCards * -1
+		points += changes.yellowCards * -2
+		points += changes.redCards * -3
+		
+		return points
+	}
+
+	function updateGwChange(playerId: string, field: string, value: number) {
+		setGwChanges(prev => {
+			const current = prev[playerId] || {goals: 0, assists: 0, cleanSheets: 0, greenCards: 0, yellowCards: 0, redCards: 0}
+			const updated = { ...current, [field]: value }
+			return { ...prev, [playerId]: updated }
+		})
+		
+		// Update working players with new points after state update
+		setTimeout(() => {
+			setWorkingPlayers(prev => prev.map(p => {
+				if (p.id !== playerId) return p
+				const changes = { ...(gwChanges[playerId] || {goals: 0, assists: 0, cleanSheets: 0, greenCards: 0, yellowCards: 0, redCards: 0}), [field]: value }
+				const gwPoints = calculatePoints(p, changes)
+				const originalTotal = Number(p.pointsTotal) || 0
+				const originalGw = Number(p.pointsGw) || 0
+				const newTotal = originalTotal - originalGw + gwPoints
+				
+				return {
 				...p,
-				pointsGw: Number(p.pointsGw)||0,
-				pointsTotal: Number(p.pointsTotal)||0,
-				goals: Number(p.goals)||0,
-				assists: Number(p.assists)||0,
-				cleanSheets: Number(p.cleanSheets)||0,
-				greenCards: Number(p.greenCards)||0,
-				yellowCards: Number(p.yellowCards)||0,
-				redCards: Number(p.redCards)||0,
-				prevGwPoints: Number((p as any).prevGwPoints)||0
-			}
-			const withEvent = mutate(normalized)
-			const updated = applyDynamicPricing({ ...withEvent, pointsGw: (withEvent.pointsGw||0)+deltaPoints, pointsTotal: (withEvent.pointsTotal||0)+deltaPoints, updatedAt: Date.now() }, deltaPoints)
-			return updated
-		}))
-		setPendingIds(prev=> new Set(prev).add(id))
+
+					pointsGw: gwPoints,
+					pointsTotal: newTotal,
+					updatedAt: Date.now()
+				}
+			}))
+		}, 0)
+		
+		setPendingIds(prev => new Set(prev).add(playerId))
 	}
 
 	const totals = useMemo(()=>({
@@ -130,33 +175,66 @@ export default function Admin(){
 	},[sortedPlayers])
 
 	async function finalizeGameweek(){
-		const batch = writeBatch(db)
-		for (const p of workingPlayers){
-			const base = players.find(x=>x.id===p.id)
-			if (base){
-				if (!pendingIds.has(p.id)) continue
-				batch.update(doc(db,'players',p.id), p as any)
+		try {
+			const batch = writeBatch(db)
+			
+			// Update player stats by adding gameweek changes to totals
+			for (const playerId in gwChanges){
+				const changes = gwChanges[playerId]
+				const player = players.find(p => p.id === playerId)
+				if (!player) continue
+				
+				const updatedPlayer = {
+					...player,
+					goals: (Number(player.goals) || 0) + changes.goals,
+					assists: (Number(player.assists) || 0) + changes.assists,
+					cleanSheets: (Number(player.cleanSheets) || 0) + changes.cleanSheets,
+					greenCards: (Number(player.greenCards) || 0) + changes.greenCards,
+					yellowCards: (Number(player.yellowCards) || 0) + changes.yellowCards,
+					redCards: (Number(player.redCards) || 0) + changes.redCards,
+					pointsTotal: (Number(player.pointsTotal) || 0) + changes.goals * (player.position === 'DEF' ? 6 : 5) + changes.assists * 3 + changes.cleanSheets * (player.position === 'GK' ? 6 : player.position === 'DEF' ? 4 : 2) + changes.greenCards * -1 + changes.yellowCards * -2 + changes.redCards * -3,
+					updatedAt: Date.now()
+				}
+				
+				batch.update(doc(db,'players',playerId), updatedPlayer as any)
 			}
+			
+			// Update team points
+			const playerGwMap: Record<string, number> = {}
+			for (const playerId in gwChanges){
+				const changes = gwChanges[playerId]
+				const player = players.find(p => p.id === playerId)
+				if (!player) continue
+				
+				const gwPoints = calculatePoints(player, changes)
+				playerGwMap[playerId] = gwPoints
+			}
+			
+			const teamsSnap = await (await import('firebase/firestore')).getDocs(collection(db,'teams'))
+			teamsSnap.forEach(d=>{
+				const t = d.data() as any
+				const ids: string[] = Array.isArray(t.players)? t.players : []
+				const captain: string|undefined = t.captainId
+				let gw = 0
+				for (const id of ids){ gw += playerGwMap[id]||0 }
+				if (captain) gw += playerGwMap[captain]||0
+				const prevGw = Number(t.teamPointsGw)||0
+				const total = (Number(t.teamPointsTotal)||0) + gw
+				batch.set(doc(db,'teams',d.id), { teamPrevGwPoints: prevGw, teamPointsGw: gw, teamPointsTotal: total, updatedAt: Date.now() }, { merge: true })
+			})
+			
+			// Reset gameweek changes and points
+			for (const p of workingPlayers){
+				batch.update(doc(db,'players',p.id), { prevGwPoints: p.pointsGw, pointsGw: 0, updatedAt: Date.now() } as any)
+			}
+			
+			await batch.commit()
+			setGwChanges({})
+			alert('Gameweek finalized and data saved successfully!')
+		} catch (error) {
+			console.error('Error finalizing gameweek:', error)
+			alert(`Failed to save data: ${error instanceof Error ? error.message : 'Unknown error'}. Please check your Firebase permissions or try again.`)
 		}
-		const playerGwMap: Record<string, number> = {}
-		for (const p of workingPlayers){ playerGwMap[p.id] = Number(p.pointsGw)||0 }
-		const teamsSnap = await (await import('firebase/firestore')).getDocs(collection(db,'teams'))
-		teamsSnap.forEach(d=>{
-			const t = d.data() as any
-			const ids: string[] = Array.isArray(t.players)? t.players : []
-			const captain: string|undefined = t.captainId
-			let gw = 0
-			for (const id of ids){ gw += playerGwMap[id]||0 }
-			if (captain) gw += playerGwMap[captain]||0
-			const prevGw = Number(t.teamPointsGw)||0
-			const total = (Number(t.teamPointsTotal)||0) + gw
-			batch.set(doc(db,'teams',d.id), { teamPrevGwPoints: prevGw, teamPointsGw: gw, teamPointsTotal: total, updatedAt: Date.now() }, { merge: true })
-		})
-		for (const p of workingPlayers){
-			batch.update(doc(db,'players',p.id), { prevGwPoints: p.pointsGw, pointsGw: 0, updatedAt: Date.now() } as any)
-		}
-		await batch.commit()
-		alert('Gameweek finalized and data saved')
 	}
 
 	return (
@@ -191,28 +269,77 @@ export default function Admin(){
 					{TEAMS.map(team => (
 						<div key={team} className="card">
 							<h4 style={{marginBottom:8}}>{TEAM_LABEL[team]}</h4>
-							<div className="grid" style={{gridTemplateColumns:'repeat(2,1fr)',gap:12}}>
-								{(['GK','DEF','MID','FWD'] as Position[]).map(pos => (
-									<div key={pos} className="card">
-										<div className="subtitle" style={{marginBottom:6}}>{pos==='GK'?'Goalkeepers':pos==='DEF'?'Defenders':pos==='MID'?'Midfielders':'Forwards'}</div>
-										<div className="grid" style={{gridTemplateColumns:'1fr'}}>
+
+								<div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
+								    {(['GK','DEF','MID','FWD'] as Position[]).map(pos => (
+
+									<div key={pos} className="card primary section">
+										<div className="subtitle" style={{marginBottom: '12px', fontSize: '14px', fontWeight: '600', color: 'var(--surface)'}}>
+											{pos==='GK'?'Goalkeepers':pos==='DEF'?'Defenders':pos==='MID'?'Midfielders':'Forwards'}
+										</div>
+										<div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
 											{groupedByTeam[team][pos].map(p=> (
-												<div className="card" key={p.id}>
-													<b>{p.name}</b> — £{p.price}M
-													<div>GW/Total: {p.pointsGw} / {p.pointsTotal}</div>
-													<div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}>
-														{p.position!=='GK' && (<>
-															{p.position==='DEF' && <button className="btn" onClick={()=>applyEventLocal(p.id, +6, (x)=>({ ...x, goals: x.goals+1 }))}>Goal +6</button>}
-															{p.position==='MID' && <button className="btn" onClick={()=>applyEventLocal(p.id, +5, (x)=>({ ...x, goals: x.goals+1 }))}>Goal +5</button>}
-															{p.position==='FWD' && <button className="btn" onClick={()=>applyEventLocal(p.id, +5, (x)=>({ ...x, goals: x.goals+1 }))}>Goal +5</button>}
-															<button className="btn secondary" onClick={()=>applyEventLocal(p.id, +3, (x)=>({ ...x, assists: x.assists+1 }))}>Assist +3</button>
-														</>)}
-														{p.position==='GK' && <button className="btn" onClick={()=>applyEventLocal(p.id, +6, (x)=>({ ...x, cleanSheets: x.cleanSheets+1 }))}>Clean Sheet +6</button>}
-														{p.position==='DEF' && <button className="btn secondary" onClick={()=>applyEventLocal(p.id, +4, (x)=>({ ...x, cleanSheets: x.cleanSheets+1 }))}>Clean Sheet +4</button>}
-														{p.position==='MID' && <button className="btn secondary" onClick={()=>applyEventLocal(p.id, +2, (x)=>({ ...x, cleanSheets: x.cleanSheets+1 }))}>Clean Sheet +2</button>}
-														<button className="btn secondary" onClick={()=>applyEventLocal(p.id, -1, (x)=>({ ...x, greenCards: x.greenCards+1 }))} style={{background:'#e8fce8',borderColor:'#bbf7d0',color:'#166534'}}>Green -1</button>
-														<button className="btn secondary" onClick={()=>applyEventLocal(p.id, -2, (x)=>({ ...x, yellowCards: x.yellowCards+1 }))} style={{background:'#fff7ed',borderColor:'#fed7aa',color:'#9a3412'}}>Yellow -2</button>
-														<button className="btn secondary" onClick={()=>applyEventLocal(p.id, -3, (x)=>({ ...x, redCards: x.redCards+1 }))} style={{background:'#fef2f2',borderColor:'#fecaca',color:'#991b1b'}}>Red -3</button>
+
+												<div className="card inner" key={p.id}>
+													<div className="card-header">
+														<div>
+															<div className="text-title-sm">
+																{p.name}
+															</div>
+															<div className="text-sm text-muted">
+																£{p.price}M • {pos} • GW: {p.pointsGw} • Total: {p.pointsTotal}
+															</div>
+														</div>
+													</div>
+													<div className="fields-grid">
+														{p.position !== 'GK' && (
+															<div>
+																<label className="field-label">Goals</label>
+																<select className="input" value={gwChanges[p.id]?.goals || 0} onChange={(e) => updateGwChange(p.id, 'goals', parseInt(e.target.value))}>
+																	{Array.from({length: 11}, (_, i) => <option key={i} value={i}>{i}</option>)}
+																</select>
+															</div>
+														)}
+														{p.position !== 'GK' && (
+															<div>
+																<label className="field-label">Assists</label>
+																<select className="input" value={gwChanges[p.id]?.assists || 0} onChange={(e) => updateGwChange(p.id, 'assists', parseInt(e.target.value))}>
+																	{Array.from({length: 11}, (_, i) => <option key={i} value={i}>{i}</option>)}
+																</select>
+															</div>
+														)}
+														{p.position !== 'FWD' && (
+															<div>
+																<label className="field-label">Clean Sheet</label>
+																<label className="checkbox-tile">
+																	<input 
+																		type="checkbox" 
+																		checked={(gwChanges[p.id]?.cleanSheets || 0) > 0} 
+																		onChange={(e) => updateGwChange(p.id, 'cleanSheets', e.target.checked ? 1 : 0)}
+																		style={{margin: 0}}
+																	/>
+																	<span className="text-sm">Yes</span>
+																</label>
+															</div>
+														)}
+														<div>
+															<label className="field-label">Green Cards</label>
+															<select className="input" value={gwChanges[p.id]?.greenCards || 0} onChange={(e) => updateGwChange(p.id, 'greenCards', parseInt(e.target.value))}>
+																{Array.from({length: 3}, (_, i) => <option key={i} value={i}>{i}</option>)}
+															</select>
+														</div>
+														<div>
+															<label className="field-label">Yellow Cards</label>
+															<select className="input" value={gwChanges[p.id]?.yellowCards || 0} onChange={(e) => updateGwChange(p.id, 'yellowCards', parseInt(e.target.value))}>
+																{Array.from({length: 3}, (_, i) => <option key={i} value={i}>{i}</option>)}
+															</select>
+														</div>
+														<div>
+															<label className="field-label">Red Cards</label>
+															<select className="input" value={gwChanges[p.id]?.redCards || 0} onChange={(e) => updateGwChange(p.id, 'redCards', parseInt(e.target.value))}>
+																{Array.from({length: 2}, (_, i) => <option key={i} value={i}>{i}</option>)}
+															</select>
+														</div>
 													</div>
 												</div>
 											))}
@@ -225,7 +352,7 @@ export default function Admin(){
 				</div>
 				<div style={{display:'flex',gap:8,marginTop:12}}>
 					<button className="btn" onClick={finalizeGameweek}>Finalize Gameweek (save all)</button>
-					<button className="btn secondary" onClick={()=>{ setWorkingPlayers(players); setPendingIds(new Set()) }}>Discard Changes</button>
+					<button className="btn secondary" onClick={()=>{ setWorkingPlayers(players); setPendingIds(new Set()); setGwChanges({}) }}>Discard Changes</button>
 				</div>
 			</div>
 		</div>
