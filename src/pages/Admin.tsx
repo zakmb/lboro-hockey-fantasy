@@ -6,6 +6,7 @@ import { doc, getDoc, onSnapshot, setDoc, collection, writeBatch } from 'firebas
 import { useAuth } from '../contexts/AuthContext'
 import { isAdmin } from '../config/adminEmails'
 import { useInjuries } from '../contexts/InjuriesContext'
+import { createTeamUpdateData } from '../lib/utils'
 
 const TEAMS: TeamCode[] = ['Men1','Men2','Men3','Men4','Men5']
 const POS: Position[] = ['GK','DEF','MID','FWD']
@@ -46,7 +47,9 @@ export default function Admin(){
 			const batch = writeBatch(db)
 			const snap = await (await import('firebase/firestore')).getDocs(collection(db,'teams'))
 			snap.forEach(d=>{ 
-				batch.update(doc(db,'teams',d.id), { transferUsed: false })
+				const data = d.data()
+				const updateData = createTeamUpdateData(data)
+				batch.update(doc(db,'teams',d.id), updateData)
 			})
 			await batch.commit()
 			}
@@ -219,6 +222,7 @@ export default function Admin(){
 				const ids: string[] = Array.isArray(t.players)? t.players : []
 				const captain: string|undefined = t.captainId
 				const triplePending: boolean = !!t.tripleCaptainPending
+				
 				let gw = 0
 				for (const id of ids){ gw += playerGwMap[id]||0 }
 				if (captain) {
@@ -226,8 +230,26 @@ export default function Admin(){
 					gw += capPts
 					if (triplePending) gw += capPts
 				}
-				const total = (Number(t.teamPointsTotal)||0) + gw
-				batch.set(doc(db,'teams',d.id), { teamPrevGwPoints: gw, teamPointsTotal: total, updatedAt: Date.now(), ...(triplePending? { tripleCaptainPending: false, tripleCaptainUsed: true } : {}) }, { merge: true })
+				
+				// Use transfer deduction from database
+				const transferDeduction = Number(t.transferPointsDeduction) || 0
+				
+				const total = (Number(t.teamPointsTotal)||0) + gw - transferDeduction
+				const updateData: any = { 
+					teamPrevGwPoints: gw, 
+					teamPointsTotal: total, 
+					updatedAt: Date.now(),
+					transferPointsDeduction: 0 // Reset to 0 after applying deductions
+				}
+				
+				if (triplePending) {
+					updateData.tripleCaptainPending = false
+					updateData.tripleCaptainUsed = true
+				}
+				
+				// Free transfers are now managed in saveTeam function, not here
+				
+				batch.set(doc(db,'teams',d.id), updateData, { merge: true })
 			})
 			
 			// Reset gameweek changes and points

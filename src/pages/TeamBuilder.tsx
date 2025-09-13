@@ -9,7 +9,6 @@ import { useInjuries } from '../contexts/InjuriesContext'
 
 const TEAMS: TeamCode[] = ['Men1','Men2','Men3','Men4','Men5']
 const FORMATION = { GK: 1, DEF: 4, MID: 3, FWD: 3 } as const
-const MAX_PER_TEAM = 3
 const BUDGET_LIMIT = 100
 
 function getDeadline(): Date {
@@ -29,15 +28,17 @@ export default function TeamBuilder(){
   const [transfersEnabled, setTransfersEnabled] = useState<boolean>(false)
   const [deadline, setDeadline] = useState<Date>(getDeadline())
   const [countdown, setCountdown] = useState<string>('')
-  const [transferUsed, setTransferUsed] = useState<boolean>(false)
+  const [freeTransfers, setFreeTransfers] = useState<number>(1)
+  const [wildcardUsed, setWildcardUsed] = useState<boolean>(false)
+  const [wildcardPending, setWildcardPending] = useState<boolean>(false)
+  const [wildcardConfirm, setWildcardConfirm] = useState<boolean>(false)
+  const [transferPointsDeduction, setTransferPointsDeduction] = useState<number>(0)
   const [bank, setBank] = useState<number>(100)
-  const [buyPrices, setBuyPrices] = useState<Record<string,number>>({})
   const [collapsedPositions, setCollapsedPositions] = useState<Record<Position,boolean>>({GK:false,DEF:false,MID:false,FWD:false})
   const [tripleCaptainUsed, setTripleCaptainUsed] = useState<boolean>(false)
   const [tripleCaptainPending, setTripleCaptainPending] = useState<boolean>(false)
   const [tripleCaptainConfirm, setTripleCaptainConfirm] = useState<boolean>(false)
 
-  // countdown
   useEffect(()=>{
     const timer = setInterval(()=>{
       const now = Date.now()
@@ -52,7 +53,6 @@ export default function TeamBuilder(){
     return ()=>clearInterval(timer)
   },[deadline])
 
-  // live players and config (transfers enabled + weekly reset)
   useEffect(()=>{
     const unsubPlayers = onSnapshot(collection(db,'players'), snap=>{
       const list: Player[] = []
@@ -70,20 +70,22 @@ export default function TeamBuilder(){
             const batch = writeBatch(db)
             const teamsSnap = await getDocs(collection(db,'teams'))
             teamsSnap.forEach(docSnap=>{
-              batch.set(doc(db,'teams',docSnap.id), { transferUsed: false }, { merge: true })
+              batch.set(doc(db,'teams',docSnap.id), {
+                transferPointsDeduction: 0
+              }, { merge: true })
             })
             await batch.commit()
           }catch(err){
-            console.error('Failed to reset transferUsed for all teams', err)
+            console.error('Failed to reset transfer system for all teams', err)
           }
         }
+        
         prevTransfersEnabledRef.current = next
       }
     })
     return ()=>{ unsubPlayers(); unsubConfig() }
   },[])
 
-  // load/save team doc
   useEffect(()=>{
     if(!user) return
     const ref = doc(db,'teams',user.id)
@@ -91,10 +93,14 @@ export default function TeamBuilder(){
       const data = s.data() as any
       if (data?.players && Array.isArray(data.players)) { setSelected(data.players as string[]); setBaseline(data.players as string[]) }
       if (data?.captainId) { setCaptainId(data.captainId as string); setBaselineCaptain(data.captainId as string) }
-      if (data?.transferUsed !== undefined) setTransferUsed(!!data.transferUsed)
+      if (typeof data?.freeTransfers === 'number') setFreeTransfers(data.freeTransfers)
+      else setFreeTransfers(1)
+      if (data?.wildcardUsed !== undefined) setWildcardUsed(!!data.wildcardUsed)
+      if (data?.wildcardPending !== undefined) setWildcardPending(!!data.wildcardPending)
+      if (typeof data?.transferPointsDeduction === 'number') setTransferPointsDeduction(data.transferPointsDeduction)
+      else setTransferPointsDeduction(0)
       if (typeof data?.bank === 'number') setBank(data.bank)
       else setBank(100)
-      if (data?.buyPrices && typeof data.buyPrices === 'object') setBuyPrices(data.buyPrices)
       if (data?.tripleCaptainUsed !== undefined) setTripleCaptainUsed(!!data.tripleCaptainUsed)
       if (data?.tripleCaptainPending !== undefined) setTripleCaptainPending(!!data.tripleCaptainPending)
     })
@@ -102,10 +108,14 @@ export default function TeamBuilder(){
       const data = s.data() as any
       if (data?.players && Array.isArray(data.players)) { setSelected(data.players as string[]); setBaseline(data.players as string[]) }
       if (data?.captainId) { setCaptainId(data.captainId as string); setBaselineCaptain(data.captainId as string) }
-      if (data?.transferUsed !== undefined) setTransferUsed(!!data.transferUsed)
+      if (typeof data?.freeTransfers === 'number') setFreeTransfers(data.freeTransfers)
+      else setFreeTransfers(1)
+      if (data?.wildcardUsed !== undefined) setWildcardUsed(!!data.wildcardUsed)
+      if (data?.wildcardPending !== undefined) setWildcardPending(!!data.wildcardPending)
+      if (typeof data?.transferPointsDeduction === 'number') setTransferPointsDeduction(data.transferPointsDeduction)
+      else setTransferPointsDeduction(0)
       if (typeof data?.bank === 'number') setBank(data.bank)
       else setBank(100)
-      if (data?.buyPrices && typeof data.buyPrices === 'object') setBuyPrices(data.buyPrices)
       if (data?.tripleCaptainUsed !== undefined) setTripleCaptainUsed(!!data.tripleCaptainUsed)
       if (data?.tripleCaptainPending !== undefined) setTripleCaptainPending(!!data.tripleCaptainPending)
     })
@@ -145,7 +155,19 @@ export default function TeamBuilder(){
     return Math.ceil(diff/2)
   },[baseline,selected])
 
-  const allowedTransfersAfterDeadline = transferUsed ? 0 : 1
+  const liveFreeTransfers = useMemo(() => {
+    if (wildcardPending) return '∞'
+    if (baseline.length === 0) return freeTransfers
+    return Math.max(0, freeTransfers - transfersUsed)
+  }, [freeTransfers, transfersUsed, wildcardPending, baseline.length])
+
+  const liveTransferPointsDeduction = useMemo(() => {
+    if (wildcardPending) return 0
+    if (baseline.length === 0) return transferPointsDeduction
+    const transfersOverFree = Math.max(0, transfersUsed - freeTransfers)
+    return transferPointsDeduction + (transfersOverFree * 4)
+  }, [transfersUsed, freeTransfers, wildcardPending, baseline.length, transferPointsDeduction])
+
   const meetsFormation = (counts.GK===1 && counts.DEF===4 && counts.MID===3 && counts.FWD===3)
   const captainValid = captainId && selected.includes(captainId)
 
@@ -153,17 +175,18 @@ export default function TeamBuilder(){
     if (!afterDeadline) return true
     if (baseline.length === 0) return captainValid
     if (!transfersEnabled) return JSON.stringify(selected.sort())===JSON.stringify(baseline.sort()) && captainValid
-    return transfersUsed <= allowedTransfersAfterDeadline && captainValid
-  },[afterDeadline,transfersEnabled,transfersUsed,allowedTransfersAfterDeadline,baseline,selected,captainValid])
-
-  const canSave = selected.length===11 && meetsFormation && captainValid && deadlinePolicyOk && squadCost <= budget
-  const hardDisabled = afterDeadline && !transfersEnabled && baseline.length > 0
+    return captainValid
+  },[afterDeadline,transfersEnabled,baseline,selected,captainValid])
 
   const hasChanges = useMemo(() => {
     const playersChanged = JSON.stringify(selected.sort()) !== JSON.stringify(baseline.sort())
     const captainChanged = captainId !== baselineCaptain
     return playersChanged || captainChanged
   }, [selected, baseline, captainId, baselineCaptain])
+
+  const canSave = selected.length===11 && meetsFormation && captainValid && deadlinePolicyOk && squadCost <= budget
+  const hardDisabled = afterDeadline && !transfersEnabled && baseline.length > 0
+  const controlsDisabled = hardDisabled
 
   const errorMessages = useMemo(()=>{
     const errs: string[] = []
@@ -174,10 +197,12 @@ export default function TeamBuilder(){
     if (counts.FWD !== 3) errs.push('You must pick exactly 3 Forwards.')
     if (!captainValid) errs.push('Select a captain from your 11 players.')
     if (afterDeadline && !transfersEnabled && baseline.length > 0) errs.push('Transfer window closed. No changes allowed.')
-    if (afterDeadline && transfersEnabled && baseline.length > 0 && transfersUsed>1) errs.push('Only 1 transfer allowed while transfers are enabled.')
+    if (liveTransferPointsDeduction > 0) {
+      errs.push(`${liveTransferPointsDeduction / 4} transfer${liveTransferPointsDeduction / 4 > 1 ? 's' : ''} over free limit will cost ${liveTransferPointsDeduction} points at gameweek end.`)
+    }
     if (squadCost > budget) errs.push(`Budget exceeded: £${squadCost.toFixed(1)}M / £${budget.toFixed(1)}M`)
     return errs
-  },[selected.length, counts, captainValid, afterDeadline, transfersEnabled, transfersUsed, squadCost, budget])
+  },[selected.length, counts, captainValid, afterDeadline, transfersEnabled, liveTransferPointsDeduction, squadCost, budget])
 
   function canPickByPosition(p: Player): boolean {
     const nc={...counts} as Record<Position,number>
@@ -199,7 +224,7 @@ export default function TeamBuilder(){
     const p=pool.find(x=>x.id===id)!
     if(selected.includes(id)){
       if (baseline.length === 0) {
-      } else if (hardDisabled || (afterDeadline && transfersEnabled && transferUsed)) {
+      } else if (hardDisabled) {
         return
       }
       setSelected(prev=>prev.filter(x=>x!==id))
@@ -212,14 +237,7 @@ export default function TeamBuilder(){
       if (afterDeadline) {
         if (baseline.length === 0) {
           if (simulate.length > 11) return
-        } else if (transfersEnabled) {
-          const base = new Set(baseline)
-          let diff = 0
-          for (const pid of simulate) if (!base.has(pid)) diff++
-          for (const pid of base) if (!simulate.includes(pid)) diff++
-          const used = Math.ceil(diff/2)
-          if (used>1) return
-        } else {
+        } else if (!transfersEnabled) {
           return
         }
       }
@@ -231,39 +249,8 @@ export default function TeamBuilder(){
   async function saveTeam(){
     if(!user||!canSave) return;
 
-    let nextBank = bank
-    let nextBuy = { ...buyPrices }
-
-    if (baseline.length===0 && selected.length===11){
-      for (const p of selectedPlayers){
-        nextBuy[p.id] = p.price
-      }
-    } else {
-      const baseSet = new Set(baseline)
-      const nowSet = new Set(selected)
-
-      for (const removed of baseline){
-        if (!nowSet.has(removed)){
-          const p = pool.find(x=>x.id===removed)
-          if (p){
-            nextBank += p.price
-            delete nextBuy[removed]
-          }
-        }
-      }
-
-      for (const added of selected){
-        if (!baseSet.has(added)){
-          const p = pool.find(x=>x.id===added)
-          if (p){
-            nextBuy[added] = p.price
-            nextBank -= p.price
-          }
-        }
-      }
-
-      nextBank = Math.max(0, nextBank)
-    }
+    const currentSquadCost = selectedPlayers.reduce((total, p) => total + p.price, 0)
+    const nextBank = BUDGET_LIMIT - currentSquadCost
 
     const payload: any = {
       id: user.id,
@@ -273,9 +260,12 @@ export default function TeamBuilder(){
       captainId,
       bank: parseFloat(nextBank.toFixed(1)),
       budget: BUDGET_LIMIT,
-      buyPrices: nextBuy,
       tripleCaptainUsed,
       tripleCaptainPending,
+      freeTransfers,
+      wildcardUsed,
+      wildcardPending,
+      transferPointsDeduction,
       updatedAt: Date.now()
     }
 
@@ -283,20 +273,31 @@ export default function TeamBuilder(){
       payload.createdAt = Date.now()
     }
 
-    if (afterDeadline && transfersEnabled && transfersUsed>0) payload.transferUsed = true
+    if (afterDeadline && transfersEnabled && transfersUsed>0) {
+      if (wildcardPending) {
+        payload.transferPointsDeduction = 0
+      } else {
+        const transfersToDeduct = Math.min(transfersUsed, freeTransfers)
+        payload.freeTransfers = Math.max(0, freeTransfers - transfersToDeduct)
+        const transfersOverFree = Math.max(0, transfersUsed - freeTransfers)
+        payload.transferPointsDeduction = transferPointsDeduction + (transfersOverFree * 4)
+      }
+    }
     await setDoc(doc(db,'teams',user.id), payload, { merge: true })
-    setBaseline(selected); setBaselineCaptain(captainId); setBank(payload.bank); setBuyPrices(nextBuy); if (payload.transferUsed) setTransferUsed(true); alert('Team saved!')
+    setBaseline(selected); setBaselineCaptain(captainId); setBank(payload.bank); 
+    if (payload.freeTransfers !== undefined) setFreeTransfers(payload.freeTransfers)
+    if (payload.wildcardUsed !== undefined) setWildcardUsed(payload.wildcardUsed)
+    if (payload.wildcardPending !== undefined) setWildcardPending(payload.wildcardPending)
+    if (payload.transferPointsDeduction !== undefined) setTransferPointsDeduction(payload.transferPointsDeduction)
+    alert('Team saved!')
   }
 
   function resetTeam(){
     setSelected(baseline)
     setCaptainId(baselineCaptain)
-    let originalBank = 100
-    for (const playerId of baseline) {
-      const p = pool.find(x => x.id === playerId)
-      if (p) originalBank -= p.price
-    }
-    setBank(originalBank)
+    const baselinePlayers = baseline.map(id => pool.find(p => p.id === id)).filter(Boolean)
+    const baselineCost = baselinePlayers.reduce((total, p) => total + (p?.price || 0), 0)
+    setBank(BUDGET_LIMIT - baselineCost)
   }
 
   const byPos = useMemo(()=>({
@@ -323,7 +324,7 @@ export default function TeamBuilder(){
           <div id={`pos-${pos}`} className="players-grid">
             {byPos[pos].map(p=>{
               const isSel=selected.includes(p.id)
-              const disabled=(!isSel && !canPickByPosition(p)) || (isSel && (hardDisabled || (afterDeadline && transfersEnabled && transferUsed)))
+              const disabled=(!isSel && !canPickByPosition(p)) || (isSel && hardDisabled)
               return (
                 <div
                   key={p.id}
@@ -364,7 +365,6 @@ export default function TeamBuilder(){
       if (!el) return
 
       const compute = () => {
-        // For each row, compute its per-column width, then use the smallest across all rows
         const rows = Array.from(el.querySelectorAll<HTMLElement>('.row'))
         if (!rows.length) return
         const widths: number[] = []
@@ -380,7 +380,7 @@ export default function TeamBuilder(){
 
         const minCol = Math.floor(Math.min(...widths))
         el.style.setProperty('--chip-max-global', `${minCol}px`)
-        const scale = Math.max(0.64, Math.min(1, minCol / 160)) // 160px ≈ comfy base
+        const scale = Math.max(0.64, Math.min(1, minCol / 160))
         el.style.setProperty('--font-scale-global', `${scale}`)
       }
 
@@ -416,7 +416,6 @@ export default function TeamBuilder(){
   function Row({ players, cols, isDefenders = false }:{
     players: Player[], cols: number, isDefenders?: boolean
   }){
-    // Fill with placeholders to always keep the exact number of columns
     const filled: (Player | undefined)[] = [...players]
     while (filled.length < cols) filled.push(undefined)
 
@@ -455,11 +454,6 @@ export default function TeamBuilder(){
     <div className="layout">
       <div className="left">
 
-        {afterDeadline && transfersEnabled && transferUsed && (
-          <div className="card notice notice--purple" role="status">
-            You have made your change for this week. You can still change your captain.
-          </div>
-        )}
         {afterDeadline && !transfersEnabled && (
           <div className="card notice notice--purple" role="status">
             Changes can not be made currently, you will be notified when they can be done
@@ -476,19 +470,37 @@ export default function TeamBuilder(){
             <div className="subtitle">Budget</div>
             <div className="budget-amount" aria-live="polite">£{bank.toFixed(1)}M</div>
           </div>
+          
+        <br/>
+          {(tripleCaptainPending || wildcardPending) && (
+            <div className="card notice notice--blue" role="status" style={{marginBottom: '12px'}}>
+              <strong>Chip Active:</strong> Only one chip can be used per week. The other chip is blocked.
+            </div>
+          )}
+          {!tripleCaptainUsed && !wildcardUsed && !tripleCaptainPending && !wildcardPending && (
+            <div className="card notice notice--yellow" role="status" style={{marginBottom: '12px'}}>
+              <strong>Note:</strong> You can only use one chip (Triple Captain or Wildcard) per week.
+            </div>
+          )}
+          <br/>
+          
           <div className="grid" style={{gridTemplateColumns:'1fr auto', alignItems:'center'}}>
             <div className="subtitle">Triple Captain</div>
             {tripleCaptainUsed ? (
               <button className="btn secondary" disabled title="Already used">Used</button>
             ) : tripleCaptainPending ? (
               <button className="btn secondary" disabled title="Will apply on next scoring">Activated</button>
+            ) : wildcardPending ? (
+              <button className="btn secondary" disabled title="Cannot use with wildcard active" style={{opacity: 0.5, backgroundColor: 'var(--color-red-light)'}}>
+                Blocked by Wildcard
+              </button>
             ) : tripleCaptainConfirm ? (
               <button
-                className="btn"
-                disabled={!captainValid}
-                title={!captainValid ? 'Select a captain first' : 'Confirm triple captain for next scoring'}
+                className={`btn ${(!captainValid || controlsDisabled) ? 'btn--disabled' : ''}`}
+                disabled={!captainValid || controlsDisabled}
+                title={!captainValid ? 'Select a captain first' : controlsDisabled ? 'Transfer window is closed' : 'Confirm triple captain for next scoring'}
                 onClick={async ()=>{
-                  if (!captainValid || !user) return
+                  if (!captainValid || !user || controlsDisabled) return
                   setTripleCaptainPending(true)
                   setTripleCaptainConfirm(false)
                   await setDoc(doc(db,'teams',user.id), { tripleCaptainPending: true }, { merge: true })
@@ -498,17 +510,80 @@ export default function TeamBuilder(){
               </button>
             ) : (
               <button
-                className="btn"
-                disabled={!captainValid}
-                title={!captainValid ? 'Select a captain first' : 'Triples next scoring for your captain'}
+                className={`btn ${(!captainValid || controlsDisabled) ? 'btn--disabled' : ''}`}
+                disabled={!captainValid || controlsDisabled}
+                title={!captainValid ? 'Select a captain first' : controlsDisabled ? 'Transfer window is closed' : 'Triples next scoring for your captain'}
                 onClick={()=> setTripleCaptainConfirm(true)}
               >
                 Activate?
               </button>
             )}
           </div>
+          
+          <br/>
+
+          <div className="grid" style={{gridTemplateColumns:'1fr auto', alignItems:'center'}}>
+            <div className="subtitle">Wildcard</div>
+            {wildcardUsed ? (
+              <button className="btn secondary" disabled title="Already used">Used</button>
+            ) : wildcardPending ? (
+              <button className="btn secondary" disabled title="Will apply on next save">Activated</button>
+            ) : tripleCaptainPending ? (
+              <button className="btn secondary" disabled title="Cannot use with triple captain active" style={{opacity: 0.5, backgroundColor: 'var(--color-red-light)'}}>
+                Blocked by Triple Captain
+              </button>
+            ) : wildcardConfirm ? (
+              <button
+                className={`btn ${controlsDisabled ? 'btn--disabled' : ''}`}
+                disabled={controlsDisabled}
+                title={controlsDisabled ? 'Transfer window is closed' : 'Confirm wildcard for unlimited transfers this week'}
+                onClick={async ()=>{
+                  if (!user || controlsDisabled) return
+                  setWildcardPending(true)
+                  setWildcardConfirm(false)
+                  await setDoc(doc(db,'teams',user.id), { wildcardPending: true }, { merge: true })
+                }}
+              >
+                Confirm?
+              </button>
+            ) : (
+              <button
+                className={`btn ${controlsDisabled ? 'btn--disabled' : ''}`}
+                disabled={controlsDisabled}
+                title={controlsDisabled ? 'Transfer window is closed' : 'Allows unlimited transfers with no point deductions for one week'}
+                onClick={()=> setWildcardConfirm(true)}
+              >
+                Activate?
+              </button>
+            )}
+          </div>
+
+          <br/>
+          
+          <div className="grid" style={{gridTemplateColumns:'1fr auto', alignItems:'center'}}>
+            <div className="subtitle">Free Transfers</div>
+            <div className="budget-amount">{liveFreeTransfers}</div>
+          </div>
+
+          <br/>
+          
+          <div className="grid" style={{gridTemplateColumns:'1fr auto', alignItems:'center'}}>
+            <div className="subtitle">Gameweeks Point Deduction</div>
+            <div className="budget-amount" style={{color: liveTransferPointsDeduction > 0 ? 'var(--color-red)' : 'var(--muted)'}}>
+              {liveTransferPointsDeduction > 0 ? `-${liveTransferPointsDeduction}` : '0'}
+            </div>
+          </div>
+
+        <br/>
+
           <label className="subtitle label" htmlFor="captain">Captain</label>
-          <select id="captain" className="input" value={captainId} onChange={e=>setCaptainId(e.target.value)}>
+          <select 
+            id="captain" 
+            className={`input ${controlsDisabled ? 'input--disabled' : ''}`} 
+            value={captainId} 
+            onChange={e=>setCaptainId(e.target.value)} 
+            disabled={controlsDisabled}
+          >
             <option value="">Select your captain</option>
             {selectedPlayers.map(p=> <option key={p.id} value={p.id}>{p.name}{isInjured(p.id) ? ' 🚑' : ''} — {p.position}</option>)}
           </select>
@@ -524,7 +599,13 @@ export default function TeamBuilder(){
             </div>
           )}
           <div className="actions sticky-actions">
-            <button disabled={hardDisabled || !canSave} className="btn" onClick={saveTeam}>Save Team</button>
+            <button 
+              disabled={hardDisabled || !canSave} 
+              className={`btn ${(hardDisabled || !canSave) ? 'btn--disabled' : ''}`}
+              onClick={saveTeam}
+            >
+              Save Team
+            </button>
             <button disabled={!hasChanges} className="btn secondary" onClick={resetTeam}>Reset</button>
           </div>
         </div>

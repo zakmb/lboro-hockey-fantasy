@@ -42,13 +42,13 @@ export interface FantasyTeam {
 	budget: number
 	createdAt: number
 	updatedAt: number
+	freeTransfers?: number
+	wildcardUsed?: boolean
+	transferPointsDeduction?: number
 }
 
 export interface LeagueSettings {
 	transfersEnabled: boolean
-	minPerTeams: Record<TeamCode, number>
-    //TODO: Remove references to budgetStart
-	budgetStart: number
 }
 
 export interface League {
