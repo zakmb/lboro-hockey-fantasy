@@ -19,7 +19,7 @@ function getDeadline(): Date {
 export default function TeamBuilder(){
   const { user } = useAuth()
   const { isInjured } = useInjuries()
-  const prevTransfersEnabledRef = useRef<boolean>(false)
+  const prevTransfersEnabledRef = useRef<boolean | null>(null)
   const [pool, setPool] = useState<Player[]>([])
   const [selected, setSelected] = useState<string[]>([])
   const [captainId, setCaptainId] = useState<string>('')
@@ -65,7 +65,7 @@ export default function TeamBuilder(){
         const next = !!data.transfersEnabled
         const prev = prevTransfersEnabledRef.current
         setTransfersEnabled(next)
-        if (prev === false && next === true){
+        if (prev !== null && prev === false && next === true){
           try{
             const batch = writeBatch(db)
             const teamsSnap = await getDocs(collection(db,'teams'))

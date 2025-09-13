@@ -13,7 +13,7 @@ export function createTeamUpdateData(data: any) {
     updateData.wildcardPending = false
   } 
 
-  const currentFreeTransfers = data?.freeTransfers || 1
+  const currentFreeTransfers = data?.freeTransfers || 0
   updateData.freeTransfers = Math.min(currentFreeTransfers + 1, 3) // Increase by 1, cap at 3
   return updateData
 }
