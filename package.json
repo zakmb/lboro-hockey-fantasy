@@ -8,7 +8,10 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "test:ci": "vitest run --reporter=verbose",
+    "type-check": "tsc --noEmit",
+    "prepare": "simple-git-hooks"
   },
   "keywords": [],
   "author": "",
@@ -29,6 +32,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@vitejs/plugin-react": "^5.0.2",
     "jsdom": "^27.0.0",
+    "lint-staged": "^16.1.6",
     "vite": "^7.1.3",
     "vitest": "^3.2.4"
   }

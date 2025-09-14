@@ -56,12 +56,29 @@ describe('AuthContext', () => {
     const mockUser = {
       uid: '123',
       email: 'test@example.com',
-      displayName: 'Test User'
-    }
+      displayName: 'Test User',
+      emailVerified: true,
+      isAnonymous: false,
+      metadata: {},
+      providerData: [],
+      refreshToken: '',
+      tenantId: null,
+      delete: vi.fn(),
+      getIdToken: vi.fn(),
+      getIdTokenResult: vi.fn(),
+      reload: vi.fn(),
+      toJSON: vi.fn()
+    } as any
 
     mockOnAuthStateChanged.mockImplementation((auth, callback) => {
       // Simulate auth state change
-      setTimeout(() => callback(mockUser), 0)
+      setTimeout(() => {
+        if (typeof callback === 'function') {
+          callback(mockUser)
+        } else {
+          callback.next?.(mockUser)
+        }
+      }, 0)
       return () => {}
     })
 
@@ -79,7 +96,13 @@ describe('AuthContext', () => {
   it('provides null user when not authenticated', async () => {
     mockOnAuthStateChanged.mockImplementation((auth, callback) => {
       // Simulate no user
-      setTimeout(() => callback(null), 0)
+      setTimeout(() => {
+        if (typeof callback === 'function') {
+          callback(null)
+        } else {
+          callback.next?.(null)
+        }
+      }, 0)
       return () => {}
     })
 
@@ -96,7 +119,13 @@ describe('AuthContext', () => {
 
   it('calls signInWithEmailAndPassword on login', async () => {
     mockOnAuthStateChanged.mockImplementation((auth, callback) => {
-      setTimeout(() => callback(null), 0)
+      setTimeout(() => {
+        if (typeof callback === 'function') {
+          callback(null)
+        } else {
+          callback.next?.(null)
+        }
+      }, 0)
       return () => {}
     })
 
@@ -122,7 +151,13 @@ describe('AuthContext', () => {
 
   it('calls createUserWithEmailAndPassword and updateProfile on register', async () => {
     mockOnAuthStateChanged.mockImplementation((auth, callback) => {
-      setTimeout(() => callback(null), 0)
+      setTimeout(() => {
+        if (typeof callback === 'function') {
+          callback(null)
+        } else {
+          callback.next?.(null)
+        }
+      }, 0)
       return () => {}
     })
 
@@ -163,7 +198,13 @@ describe('AuthContext', () => {
 
   it('calls signOut on logout', async () => {
     mockOnAuthStateChanged.mockImplementation((auth, callback) => {
-      setTimeout(() => callback(null), 0)
+      setTimeout(() => {
+        if (typeof callback === 'function') {
+          callback(null)
+        } else {
+          callback.next?.(null)
+        }
+      }, 0)
       return () => {}
     })
 
