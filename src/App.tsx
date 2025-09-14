@@ -2,6 +2,8 @@ import React from 'react'
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { InjuriesProvider } from './contexts/InjuriesContext'
+import { ErrorBoundary } from './components/ErrorBoundary'
+import { PageLoader } from './components/LoadingSpinner'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import TeamBuilder from './pages/TeamBuilder'
@@ -18,7 +20,7 @@ import logo from './assets/logo.png'
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
-  if (loading) return <div className="container">Loading...</div>
+  if (loading) return <PageLoader message="Authenticating..." />
   if (!user) return <Navigate to="/login" replace />
   return <>{children}</>
 }
@@ -155,7 +157,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <>
+    <ErrorBoundary>
       <AuthProvider>
         <InjuriesProvider>
           <Shell>
@@ -175,7 +177,7 @@ export default function App() {
 
       {/* ===== Local styles appended at end of file as requested ===== */}
       <style>{appStyles}</style>
-    </>
+    </ErrorBoundary>
   )
 }
 
