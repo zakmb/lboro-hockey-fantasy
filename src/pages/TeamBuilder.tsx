@@ -12,7 +12,7 @@ const FORMATION = { GK: 1, DEF: 4, MID: 3, FWD: 3 } as const
 const BUDGET_LIMIT = 100
 
 function getDeadline(): Date {
-  const d = new Date(2025, 8, 6, 12, 0, 0, 0)
+  const d = new Date(2025, 8, 26, 21, 0, 0, 0)
   return d
 }
 
@@ -27,7 +27,6 @@ export default function TeamBuilder(){
   const [baselineCaptain, setBaselineCaptain] = useState<string>('')
   const [transfersEnabled, setTransfersEnabled] = useState<boolean>(false)
   const [deadline, setDeadline] = useState<Date>(getDeadline())
-  const [countdown, setCountdown] = useState<string>('')
   const [freeTransfers, setFreeTransfers] = useState<number>(1)
   const [wildcardUsed, setWildcardUsed] = useState<boolean>(false)
   const [wildcardPending, setWildcardPending] = useState<boolean>(false)
@@ -39,19 +38,6 @@ export default function TeamBuilder(){
   const [tripleCaptainPending, setTripleCaptainPending] = useState<boolean>(false)
   const [tripleCaptainConfirm, setTripleCaptainConfirm] = useState<boolean>(false)
 
-  useEffect(()=>{
-    const timer = setInterval(()=>{
-      const now = Date.now()
-      const diff = deadline.getTime() - now
-      if (diff <= 0) { setCountdown('Deadline passed'); return }
-      const d = Math.floor(diff/86400000)
-      const h = Math.floor((diff%86400000)/3600000)
-      const m = Math.floor((diff%3600000)/60000)
-      const s = Math.floor((diff%60000)/1000)
-      setCountdown(`${d}d ${h}h ${m}m ${s}s`)
-    }, 1000)
-    return ()=>clearInterval(timer)
-  },[deadline])
 
   useEffect(()=>{
     const unsubPlayers = onSnapshot(collection(db,'players'), snap=>{
@@ -156,17 +142,19 @@ export default function TeamBuilder(){
   },[baseline,selected])
 
   const liveFreeTransfers = useMemo(() => {
+    if (!afterDeadline) return '∞'
     if (wildcardPending) return '∞'
     if (baseline.length === 0) return freeTransfers
     return Math.max(0, freeTransfers - transfersUsed)
-  }, [freeTransfers, transfersUsed, wildcardPending, baseline.length])
+  }, [afterDeadline, freeTransfers, transfersUsed, wildcardPending, baseline.length])
 
   const liveTransferPointsDeduction = useMemo(() => {
+    if (!afterDeadline) return 0
     if (wildcardPending) return 0
     if (baseline.length === 0) return transferPointsDeduction
     const transfersOverFree = Math.max(0, transfersUsed - freeTransfers)
     return transferPointsDeduction + (transfersOverFree * 4)
-  }, [transfersUsed, freeTransfers, wildcardPending, baseline.length, transferPointsDeduction])
+  }, [afterDeadline, transfersUsed, freeTransfers, wildcardPending, baseline.length, transferPointsDeduction])
 
   const meetsFormation = (counts.GK===1 && counts.DEF===4 && counts.MID===3 && counts.FWD===3)
   const captainValid = captainId && selected.includes(captainId)
@@ -397,9 +385,7 @@ export default function TeamBuilder(){
         <div className="card-title-row">
           <h3>Team</h3>
           {!afterDeadline && (
-            <div className="subtitle badge-time" title="Transfer deadline">
-              {deadline.toLocaleDateString('en-GB')} 12:00 · {countdown || 'Deadline passed'}
-            </div>
+            <CountdownBadge deadline={deadline} />
           )}
         </div>
         <div className="spacer-12"/>
@@ -446,6 +432,32 @@ export default function TeamBuilder(){
             </div>
           )
         })}
+      </div>
+    )
+  }
+
+  function CountdownBadge({ deadline }: { deadline: Date }){
+    const [tick, setTick] = useState(0)
+    const [label, setLabel] = useState<string>('')
+    useEffect(()=>{
+      const compute = ()=>{
+        const now = Date.now()
+        const diff = deadline.getTime() - now
+        if (diff <= 0) { setLabel('Deadline passed'); return }
+        const d = Math.floor(diff/86400000)
+        const h = Math.floor((diff%86400000)/3600000)
+        const m = Math.floor((diff%3600000)/60000)
+        const s = Math.floor((diff%60000)/1000)
+        setLabel(`${d}d ${h}h ${m}m ${s}s`)
+      }
+      compute()
+      const id = setInterval(()=>{ setTick(v=>v+1); compute() }, 1000)
+      return ()=> clearInterval(id)
+    },[deadline])
+    const time = useMemo(()=> deadline.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), [deadline])
+    return (
+      <div className="subtitle badge-time" title="Transfer deadline" aria-live="polite">
+        {deadline.toLocaleDateString('en-GB')} {time} · {label || '—'}
       </div>
     )
   }
