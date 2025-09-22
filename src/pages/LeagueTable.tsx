@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { db } from '../lib/firebase'
 import { collection, onSnapshot } from 'firebase/firestore'
 
@@ -18,6 +18,7 @@ interface TeamData {
 export default function LeagueTable() {
 	const [teams, setTeams] = useState<TeamData[]>([])
 	const [loading, setLoading] = useState(true)
+  const [month, setMonth] = useState<string>('all')
 
 	useEffect(() => {
 		const unsubTeams = onSnapshot(collection(db, 'teams'), (snapshot) => {
@@ -51,6 +52,37 @@ export default function LeagueTable() {
 		return team.displayName || `Team ${team.userId.slice(-4)}`
 	}
 
+  const monthsAvailable = useMemo(()=>{
+    const set = new Set<string>()
+    teams.forEach(t=>{
+      const mp: any = (t as any).monthlyPoints || {}
+      Object.keys(mp).forEach(k=> set.add(k))
+    })
+    const arr = Array.from(set)
+    arr.sort((a,b)=> a.localeCompare(b))
+    return arr
+  },[teams])
+
+  const rows = useMemo(()=>{
+    if (month==='all'){
+      return teams.map(t=>({
+        id: t.id,
+        name: getTeamName(t),
+        total: t.teamPointsTotal || 0,
+        prev: t.teamPrevGwPoints || 0
+      }))
+    }
+    return teams.map(t=>{
+      const mp: any = (t as any).monthlyPoints || {}
+      return {
+        id: t.id,
+        name: getTeamName(t),
+        total: Number(mp[month]) || 0,
+        prev: t.teamPrevGwPoints || 0
+      }
+    }).sort((a,b)=> b.total - a.total)
+  },[teams, month])
+
 	if (loading) {
 		return (
 			<div className="card">
@@ -61,7 +93,16 @@ export default function LeagueTable() {
 
 	return (
 		<div className="card">
-			<h2>League Table</h2>
+			<div className="card-header">
+				<h2>League Table</h2>
+				<div style={{display:'flex', gap:8, alignItems:'center'}}>
+					<label className="subtitle" htmlFor="month">View</label>
+					<select id="month" className="input" style={{maxWidth:220}} value={month} onChange={e=> setMonth(e.target.value)}>
+						<option value="all">All-time total</option>
+						{monthsAvailable.map(m=> <option key={m} value={m}>{m}</option>)}
+					</select>
+				</div>
+			</div>
 			<div style={{ overflowX: 'auto' }}>
 				<table style={{
 					width: '100%',
@@ -76,14 +117,14 @@ export default function LeagueTable() {
 						}}>
 							<th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Pos</th>
 							<th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Team</th>
-							<th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e5e7eb' }}>Total Points</th>
+							<th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e5e7eb' }}>{month==='all' ? 'Total Points' : `${month} Points`}</th>
 							<th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e5e7eb' }}>Prev GW</th>
 						</tr>
 					</thead>
 					<tbody>
-						{teams.map((team, index) => {
+						{rows.map((row, index) => {
 							return (
-								<tr key={team.id} style={{
+								<tr key={row.id} style={{
 									background: index % 2 === 0 ? '#f9fafb' : 'white',
 									borderBottom: '1px solid #e5e7eb'
 								}}>
@@ -96,7 +137,7 @@ export default function LeagueTable() {
 									</td>
 									<td style={{ padding: '12px' }}>
 										<div style={{ fontWeight: '600' }}>
-											{getTeamName(team)}
+											{row.name}
 										</div>
 									</td>
 									<td style={{ 
@@ -106,14 +147,14 @@ export default function LeagueTable() {
 										fontSize: '18px',
 										color: 'var(--primary)'
 									}}>
-										{team.teamPointsTotal || 0}
+										{row.total}
 									</td>
 									<td style={{ 
 										padding: '12px', 
 										textAlign: 'center',
 										fontWeight: '500'
 									}}>
-										{team.teamPrevGwPoints || 0}
+										{row.prev}
 									</td>
 								</tr>
 							)

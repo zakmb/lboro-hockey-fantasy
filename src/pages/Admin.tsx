@@ -235,11 +235,17 @@ export default function Admin(){
 				const transferDeduction = Number(t.transferPointsDeduction) || 0
 				
 				const total = (Number(t.teamPointsTotal)||0) + gw - transferDeduction
+				const now = new Date()
+				const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`
+				const prevMonthly = (t.monthlyPoints && typeof t.monthlyPoints === 'object') ? t.monthlyPoints : {}
+				const currentMonthPoints = Number(prevMonthly?.[ym]) || 0
+				const nextMonthly = { ...prevMonthly, [ym]: currentMonthPoints + (gw - transferDeduction) }
 				const updateData: any = { 
 					teamPrevGwPoints: gw, 
 					teamPointsTotal: total, 
 					updatedAt: Date.now(),
-					transferPointsDeduction: 0 // Reset to 0 after applying deductions
+					transferPointsDeduction: 0, // Reset to 0 after applying deductions
+					monthlyPoints: nextMonthly
 				}
 				
 				if (triplePending) {
