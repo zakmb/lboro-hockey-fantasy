@@ -29,7 +29,7 @@ export default function Admin(){
 	const [workingPlayers, setWorkingPlayers] = useState<Player[]>([])
 	const [form, setForm] = useState<{name:string,team:TeamCode,position:Position,price:number}>({name:'',team:'Men1',position:'MID',price:4})
 	const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())
-	const [gwChanges, setGwChanges] = useState<Record<string, {goals: number, cleanSheets: number, greenCards: number, yellow5Cards: number, yellow10Cards: number, redCards: number, result: 'win'|'draw'|'loss'|'', manOfTheMatch: boolean}>>({})
+const [gwChanges, setGwChanges] = useState<Record<string, {goals: number, cleanSheets: number, oneGoalConceded: boolean, greenCards: number, yellow5Cards: number, yellow10Cards: number, redCards: number, result: 'win'|'draw'|'loss'|'', manOfTheMatch: boolean}>>({})
 	const [injurySelectId, setInjurySelectId] = useState<string>('')
 
 	useEffect(()=>{
@@ -109,7 +109,7 @@ async function addPlayerLocal(){
 		}
 	}
 
-	function calculatePoints(player: Player, changes: {goals: number, cleanSheets: number, greenCards: number, yellow5Cards: number, yellow10Cards: number, redCards: number, result: 'win'|'draw'|'loss'|'', manOfTheMatch: boolean}): number {
+function calculatePoints(player: Player, changes: {goals: number, cleanSheets: number, oneGoalConceded: boolean, greenCards: number, yellow5Cards: number, yellow10Cards: number, redCards: number, result: 'win'|'draw'|'loss'|'', manOfTheMatch: boolean}): number {
 		let points = 0
 		// Goals
 		if (player.position === 'FWD') points += changes.goals * 3
@@ -119,6 +119,8 @@ async function addPlayerLocal(){
 		if (player.position === 'GK') points += changes.cleanSheets * 10
 		else if (player.position === 'DEF') points += changes.cleanSheets * 8
 		else if (player.position === 'MID') points += changes.cleanSheets * 2
+    // One goal conceded bonus (GK/DEF only)
+    if ((player.position === 'GK' || player.position === 'DEF') && changes.oneGoalConceded) points += 3
 		// Cards
 		points += changes.greenCards * -2
 		points += changes.yellow5Cards * -4
@@ -132,18 +134,18 @@ async function addPlayerLocal(){
 		return points
 	}
 
-	function updateGwChange(playerId: string, field: string, value: any) {
+function updateGwChange(playerId: string, field: string, value: any) {
 		setGwChanges(prev => {
-        	const current = prev[playerId] || {goals: 0, cleanSheets: 0, greenCards: 0, yellow5Cards: 0, yellow10Cards: 0, redCards: 0, result: '', manOfTheMatch: false}
+        const current = prev[playerId] || {goals: 0, cleanSheets: 0, oneGoalConceded: false, greenCards: 0, yellow5Cards: 0, yellow10Cards: 0, redCards: 0, result: '', manOfTheMatch: false}
 			const updated = { ...current, [field]: value }
 			return { ...prev, [playerId]: updated }
 		})
 		
 		// Update working players with new points after state update
         setTimeout(() => {
-			setWorkingPlayers(prev => prev.map(p => {
+            setWorkingPlayers(prev => prev.map(p => {
 				if (p.id !== playerId) return p
-                const changes = { ...(gwChanges[playerId] || {goals: 0, cleanSheets: 0, greenCards: 0, yellow5Cards: 0, yellow10Cards: 0, redCards: 0, result: '', manOfTheMatch: false}), [field]: value }
+                const changes = { ...(gwChanges[playerId] || {goals: 0, cleanSheets: 0, oneGoalConceded: false, greenCards: 0, yellow5Cards: 0, yellow10Cards: 0, redCards: 0, result: '', manOfTheMatch: false}), [field]: value }
 				const gwPoints = calculatePoints(p, changes)
 				const originalTotal = Number(p.pointsTotal) || 0
 				const originalGw = Number(p.pointsGw) || 0
@@ -363,7 +365,7 @@ async function addPlayerLocal(){
 																</select>
 															</div>
 														)}
-														{p.position !== 'FWD' && (
+                                                    {p.position !== 'FWD' && (
 															<div>
 																<label className="field-label">Clean Sheet</label>
 																<label className="checkbox-tile">
@@ -377,6 +379,20 @@ async function addPlayerLocal(){
 																</label>
 															</div>
 														)}
+                                                    {(p.position === 'GK' || p.position === 'DEF') && (
+                                                        <div>
+                                                            <label className="field-label">1 Goal Conceded</label>
+                                                            <label className="checkbox-tile">
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    checked={!!gwChanges[p.id]?.oneGoalConceded} 
+                                                                    onChange={(e) => updateGwChange(p.id, 'oneGoalConceded', e.target.checked)}
+                                                                    style={{margin: 0}}
+                                                                />
+                                                                <span className="text-sm">Yes</span>
+                                                            </label>
+                                                        </div>
+                                                    )}
 														<div>
 															<label className="field-label">Green Cards</label>
 															<select className="input" value={gwChanges[p.id]?.greenCards || 0} onChange={(e) => updateGwChange(p.id, 'greenCards', parseInt(e.target.value))}>
