@@ -119,9 +119,7 @@ function calculatePoints(player: Player, changes: {goals: number, cleanSheets: n
 		if (player.position === 'GK') points += changes.cleanSheets * 10
 		else if (player.position === 'DEF') points += changes.cleanSheets * 8
 		else if (player.position === 'MID') points += changes.cleanSheets * 2
-    // One goal conceded bonus (GK/DEF only)
-    if ((player.position === 'GK' || player.position === 'DEF') && changes.oneGoalConceded) points += 3
-		// Cards
+    	// Cards
 		points += changes.greenCards * -2
 		points += changes.yellow5Cards * -4
 		points += changes.yellow10Cards * -8
@@ -136,7 +134,7 @@ function calculatePoints(player: Player, changes: {goals: number, cleanSheets: n
 
 function updateGwChange(playerId: string, field: string, value: any) {
 		setGwChanges(prev => {
-        const current = prev[playerId] || {goals: 0, cleanSheets: 0, oneGoalConceded: false, greenCards: 0, yellow5Cards: 0, yellow10Cards: 0, redCards: 0, result: '', manOfTheMatch: false}
+        const current = prev[playerId] || {goals: 0, cleanSheets: 0, greenCards: 0, yellow5Cards: 0, yellow10Cards: 0, redCards: 0, result: '', manOfTheMatch: false}
 			const updated = { ...current, [field]: value }
 			return { ...prev, [playerId]: updated }
 		})
@@ -145,7 +143,7 @@ function updateGwChange(playerId: string, field: string, value: any) {
         setTimeout(() => {
             setWorkingPlayers(prev => prev.map(p => {
 				if (p.id !== playerId) return p
-                const changes = { ...(gwChanges[playerId] || {goals: 0, cleanSheets: 0, oneGoalConceded: false, greenCards: 0, yellow5Cards: 0, yellow10Cards: 0, redCards: 0, result: '', manOfTheMatch: false}), [field]: value }
+                const changes = { ...(gwChanges[playerId] || {goals: 0, cleanSheets: 0, greenCards: 0, yellow5Cards: 0, yellow10Cards: 0, redCards: 0, result: '', manOfTheMatch: false}), [field]: value }
 				const gwPoints = calculatePoints(p, changes)
 				const originalTotal = Number(p.pointsTotal) || 0
 				const originalGw = Number(p.pointsGw) || 0
@@ -365,7 +363,7 @@ function updateGwChange(playerId: string, field: string, value: any) {
 																</select>
 															</div>
 														)}
-                                                    {p.position !== 'FWD' && (
+                                                    	{p.position !== 'FWD' && (
 															<div>
 																<label className="field-label">Clean Sheet</label>
 																<label className="checkbox-tile">
@@ -379,20 +377,6 @@ function updateGwChange(playerId: string, field: string, value: any) {
 																</label>
 															</div>
 														)}
-                                                    {(p.position === 'GK' || p.position === 'DEF') && (
-                                                        <div>
-                                                            <label className="field-label">1 Goal Conceded</label>
-                                                            <label className="checkbox-tile">
-                                                                <input 
-                                                                    type="checkbox" 
-                                                                    checked={!!gwChanges[p.id]?.oneGoalConceded} 
-                                                                    onChange={(e) => updateGwChange(p.id, 'oneGoalConceded', e.target.checked)}
-                                                                    style={{margin: 0}}
-                                                                />
-                                                                <span className="text-sm">Yes</span>
-                                                            </label>
-                                                        </div>
-                                                    )}
 														<div>
 															<label className="field-label">Green Cards</label>
 															<select className="input" value={gwChanges[p.id]?.greenCards || 0} onChange={(e) => updateGwChange(p.id, 'greenCards', parseInt(e.target.value))}>
