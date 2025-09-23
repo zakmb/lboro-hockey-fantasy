@@ -43,7 +43,7 @@ export default function TeamBuilder(){
     const unsubPlayers = onSnapshot(collection(db,'players'), snap=>{
       const list: Player[] = []
       snap.forEach(d=> list.push(d.data() as Player))
-      setPool(list.length? list : defaultPool())
+      setPool(list)
     })
     const unsubConfig = onSnapshot(doc(db,'config','league'), async (s)=>{
       const data = s.data() as any
@@ -108,20 +108,7 @@ export default function TeamBuilder(){
     return unsub
   },[user])
 
-  function defaultPool(): Player[] {
-    return Array.from({length:40}).map((_,i)=>({
-      id:'p'+i,
-      name:'Player '+(i+1),
-      team:TEAMS[i%5],
-      position:(['GK','DEF','MID','FWD'] as const)[i%4],
-      price:4+(i%6),
-      pointsTotal:0,
-      pointsGw:0,
-      prevGwPoints:0,
-      goals:0,assists:0,cleanSheets:0,greenCards:0,yellowCards:0,redCards:0,
-      createdAt:Date.now(),updatedAt:Date.now()
-    }))
-  }
+  // default player pool removed; pool now reflects DB only
 
   const selectedPlayers = selected.map(id=> pool.find(p=>p.id===id)!).filter(Boolean)
   const counts = useMemo(()=> selectedPlayers.reduce((acc,p)=>{(acc as any)[p.position]++;return acc},{GK:0,DEF:0,MID:0,FWD:0} as Record<Position,number>),[selectedPlayers])

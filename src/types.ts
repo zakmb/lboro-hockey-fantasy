@@ -19,11 +19,12 @@ export interface Player {
 	pointsGw: number
 	prevGwPoints: number
 	goals: number
-	assists: number
 	cleanSheets: number
 	greenCards: number
-	yellowCards: number
+	yellow5Cards: number
+	yellow10Cards: number
 	redCards: number
+	manOfTheMatchCount: number
 	createdAt: number
 	updatedAt: number
 }

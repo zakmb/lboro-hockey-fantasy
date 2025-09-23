@@ -5,7 +5,7 @@ import { TEAM_LABEL } from '../types'
 import type { Player } from '../types'
 import { useInjuries } from '../contexts/InjuriesContext'
 
-type SortField = 'name' | 'team' | 'position' | 'pointsTotal' | 'prevGwPoints' | 'goals' | 'assists' | 'cleanSheets' | 'greenCards' | 'yellowCards' | 'redCards' | 'price'
+type SortField = 'name' | 'team' | 'position' | 'pointsTotal' | 'prevGwPoints' | 'goals' | 'cleanSheets' | 'greenCards' | 'yellow5Cards' | 'yellow10Cards' | 'redCards' | 'manOfTheMatchCount' | 'price'
 type SortDirection = 'asc' | 'desc'
 
 export default function PlayerStats() {
@@ -213,23 +213,23 @@ export default function PlayerStats() {
 									Goals {getSortIcon('goals')}
 								</button>
 							</th>
-							<th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e5e7eb' }}>
-								<button 
-									onClick={() => handleSort('assists')}
-									style={{
-										background: 'none',
-										border: 'none',
-										color: 'white',
-										cursor: 'pointer',
-										fontWeight: '600',
-										display: 'flex',
-										alignItems: 'center',
-										gap: '4px'
-									}}
-								>
-									Assists {getSortIcon('assists')}
-								</button>
-							</th>
+                            <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e5e7eb' }}>
+                                <button 
+                                    onClick={() => handleSort('manOfTheMatchCount')}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        fontWeight: '600',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                    }}
+                                >
+                                    MoM {getSortIcon('manOfTheMatchCount')}
+                                </button>
+                            </th>
 							<th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e5e7eb' }}>
 								<button 
 									onClick={() => handleSort('cleanSheets')}
@@ -264,23 +264,40 @@ export default function PlayerStats() {
 									Green {getSortIcon('greenCards')}
 								</button>
 							</th>
-							<th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e5e7eb' }}>
-								<button 
-									onClick={() => handleSort('yellowCards')}
-									style={{
-										background: 'none',
-										border: 'none',
-										color: 'white',
-										cursor: 'pointer',
-										fontWeight: '600',
-										display: 'flex',
-										alignItems: 'center',
-										gap: '4px'
-									}}
-								>
-									Yellow {getSortIcon('yellowCards')}
-								</button>
-							</th>
+                            <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e5e7eb' }}>
+                                <button 
+                                    onClick={() => handleSort('yellow5Cards')}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        fontWeight: '600',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                    }}
+                                >
+                                    5m yellow {getSortIcon('yellow5Cards')}
+                                </button>
+                            </th>
+                            <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e5e7eb' }}>
+                                <button 
+                                    onClick={() => handleSort('yellow10Cards')}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        fontWeight: '600',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                    }}
+                                >
+                                    10m yellow {getSortIcon('yellow10Cards')}
+                                </button>
+                            </th>
 							<th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e5e7eb' }}>
 								<button 
 									onClick={() => handleSort('redCards')}
@@ -364,14 +381,14 @@ export default function PlayerStats() {
 								}}>
 									{player.goals || 0}
 								</td>
-								<td style={{ 
-									padding: '12px', 
-									textAlign: 'center',
-									fontWeight: '600',
-									color: '#0ea5e9'
-								}}>
-									{player.assists || 0}
-								</td>
+                                <td style={{ 
+                                    padding: '12px', 
+                                    textAlign: 'center',
+                                    fontWeight: '600',
+                                    color: '#0ea5e9'
+                                }}>
+                                    {player.manOfTheMatchCount || 0}
+                                </td>
 								<td style={{ 
 									padding: '12px', 
 									textAlign: 'center',
@@ -388,14 +405,22 @@ export default function PlayerStats() {
 								}}>
 									{player.greenCards || 0}
 								</td>
-								<td style={{ 
-									padding: '12px', 
-									textAlign: 'center',
-									fontWeight: '600',
-									color: '#d97706'
-								}}>
-									{player.yellowCards || 0}
-								</td>
+                                <td style={{ 
+                                    padding: '12px', 
+                                    textAlign: 'center',
+                                    fontWeight: '600',
+                                    color: '#d97706'
+                                }}>
+                                    {player.yellow5Cards || 0}
+                                </td>
+                                <td style={{ 
+                                    padding: '12px', 
+                                    textAlign: 'center',
+                                    fontWeight: '600',
+                                    color: '#b45309'
+                                }}>
+                                    {player.yellow10Cards || 0}
+                                </td>
 								<td style={{ 
 									padding: '12px', 
 									textAlign: 'center',
