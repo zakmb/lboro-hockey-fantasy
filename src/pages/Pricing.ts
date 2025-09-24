@@ -33,7 +33,7 @@ export type Player = {
 export const priceUnit = 0.1;
 export const minPrice = 5.0;
 export const maxPrice = 18.0;
-export const weeklyMaxChange = 1.5;
+export const weeklyMaxChange = 1.0;
 
 // demand
 export const riseThreshold = 20; // net transfers per PRICE_UNIT step
@@ -118,9 +118,9 @@ export function updatePlayerPrice(playerIn: Player): Player {
 
     // Demand
     const net = (player.transfersIn ?? 0) - (player.transfersOut ?? 0);
-    const demandSteps = Math.floor(net / riseThreshold);
-    let demandDelta = demandSteps * priceUnit;
-    demandDelta = alphaDemand * demandDelta + (1 - alphaDemand) * net;
+    // proportional demand so small net moves still create 0.1 deltas (after rounding)
+    let demandDelta = (net / riseThreshold) * priceUnit;
+    demandDelta = alphaDemand * demandDelta + (1 - alphaDemand) * (player.prevPerfDelta ?? 0);
 
     // Performance
     const recentSlice = (player.pointsHistory ?? []).slice(0, lookbackMatched);
@@ -139,6 +139,7 @@ export function updatePlayerPrice(playerIn: Player): Player {
     let newPrice = (player.price ?? minPrice) + rawDelta;
     newPrice = roundToNearest(newPrice, priceUnit);
     newPrice = clamp(newPrice, minPrice, maxPrice);
+    newPrice = Math.round(newPrice * 10) / 10;
 
     const updated: Player = {
         ...player,
