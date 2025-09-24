@@ -29,8 +29,9 @@ export default function Admin(){
 	const [workingPlayers, setWorkingPlayers] = useState<Player[]>([])
 	const [form, setForm] = useState<{name:string,team:TeamCode,position:Position,price:number}>({name:'',team:'Men1',position:'MID',price:4})
 	const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())
-const [gwChanges, setGwChanges] = useState<Record<string, {goals: number, cleanSheets: number, oneGoalConceded: boolean, greenCards: number, yellow5Cards: number, yellow10Cards: number, redCards: number, result: 'win'|'draw'|'loss'|'', manOfTheMatch: boolean}>>({})
+	const [gwChanges, setGwChanges] = useState<Record<string, {goals: number, cleanSheets: number, oneGoalConceded: boolean, greenCards: number, yellow5Cards: number, yellow10Cards: number, redCards: number, result: 'win'|'draw'|'loss'|'', manOfTheMatch: boolean}>>({})
 	const [injurySelectId, setInjurySelectId] = useState<string>('')
+	const [importText, setImportText] = useState<string>('')
 
 	useEffect(()=>{
 		const ref = doc(db,'config','league')
@@ -282,6 +283,98 @@ function updateGwChange(playerId: string, field: string, value: any) {
 					<input type="checkbox" checked={transfersEnabled} onChange={e=>toggleTransfers(e.target.checked)} />
 					Enable Transfers
 				</label>
+			</div>
+
+			{/* Bulk Import */}
+			<div className="card">
+				<h3>Bulk Import Players</h3>
+				<p className="text-sm" style={{marginTop:4}}>Paste or upload text in sections per team, e.g.:</p>
+				<textarea className="input" style={{height:180, marginTop:8}} placeholder={"Paste squads..."} value={importText} onChange={e=>setImportText(e.target.value)} />
+				<div style={{height:8}}/>
+				<button className="btn" onClick={async()=>{
+					try{
+						const lines = importText.split(/\r?\n/)
+						if(lines.length===0){ alert('No input provided'); return }
+						const teamHeaderRegex = /^(?:men'?s\s*)?(1|2|3|4|5)\s*$/i
+						let currentTeam: TeamCode | null = null
+						const toCreate: Player[] = []
+						const now = Date.now()
+						const dragflickers = new Set(['spreckers','tarzan','shoey','finney','shareef','lee','schooner','haslam','skid','rdot','smithy','bb'])
+						function isDragflicker(name:string){
+							const n=name.toLowerCase()
+							for(const nick of dragflickers){ if(n.localeCompare(nick)===0) return true }
+							return false
+						}
+						function normPos(raw:string): Position | null {
+							const s = raw.trim().toUpperCase()
+							if(s==='GK' || s==='DEF' || s==='MID' || s==='FWD') return s as Position
+							return null
+						}
+						function basePrice(team:TeamCode, pos:Position): number {
+							switch(team){
+								case 'Men1': return (pos==='MID'?8: pos==='FWD'?10: 6)
+								case 'Men2': return (pos==='MID'?10: pos==='FWD'?12: 8)
+								case 'Men3': return (pos==='MID'?7: pos==='FWD'?9: 5)
+								case 'Men4': return (pos==='MID'?11: pos==='FWD'?13: 9)
+								case 'Men5': return (pos==='GK'?6: pos==='DEF'?10: pos==='MID'?12: 14)
+							}
+						}
+						function randomAdjust(): number {
+							const n = Math.floor(Math.random()*3) - 1 // -1, 0, or 1
+							return n * 0.5
+						}
+						for(const raw of lines){
+							const line = raw.trim()
+							if(!line) continue
+							const th = teamHeaderRegex.exec(line)
+							if(th){
+								const idx = th[1]
+								currentTeam = (`Men${idx}`) as TeamCode
+								continue
+							}
+							if(!currentTeam) continue
+							const parts = line.split(/\s+-\s+|,|\t|\s{2,}/).map(s=>s.trim()).filter(Boolean)
+							if(parts.length<2) continue
+							const name = parts[0]
+							const posRaw = parts.slice(1).join(' ')
+							const pos = normPos(posRaw)
+							if(!pos) continue
+							let price = basePrice(currentTeam, pos)
+							if(isDragflicker(name)) price += 2
+							price += randomAdjust()
+							const p: Player = {
+								id: crypto.randomUUID(),
+								name,
+								team: currentTeam,
+								position: pos,
+								price,
+								pointsTotal: 0,
+								pointsGw: 0,
+								prevGwPoints: 0,
+								goals: 0,
+								cleanSheets: 0,
+								greenCards: 0,
+								yellow5Cards: 0,
+								yellow10Cards: 0,
+								redCards: 0,
+								manOfTheMatchCount: 0,
+								createdAt: now,
+								updatedAt: now
+							}
+							toCreate.push(p)
+						}
+						if(toCreate.length===0){ alert('No valid players found to import.'); return }
+						const batch = writeBatch(db)
+						for(const p of toCreate){ batch.set(doc(db,'players',p.id), p as any) }
+						await batch.commit()
+						setPlayers(prev=>[...prev, ...toCreate])
+						setWorkingPlayers(prev=>[...prev, ...toCreate])
+						alert(`Imported ${toCreate.length} players successfully.`)
+					}catch(err){
+						console.error(err)
+						alert(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+					}
+				}}>Import Players</button>
 			</div>
 
 			<div className="card">
