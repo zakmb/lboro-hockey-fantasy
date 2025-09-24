@@ -27,6 +27,11 @@ export interface Player {
 	manOfTheMatchCount: number
 	createdAt: number
 	updatedAt: number
+    transfersIn: number;
+    transfersOut: number;
+    prevPerfDelta: number;
+    pointsHistory: number[]; // latest first, eg [gwThisWeek, gwLastWeek, ...]
+    matchesPlayed: number;
 }
 
 export interface UserProfile {

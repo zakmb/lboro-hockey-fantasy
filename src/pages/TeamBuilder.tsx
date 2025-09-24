@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { Player, TeamCode, Position } from '../types'
 import { TEAM_LABEL } from '../types'
 import { db } from '../lib/firebase'
-import { collection, onSnapshot, doc, setDoc, getDoc, getDocs, writeBatch } from 'firebase/firestore'
+import { collection, onSnapshot, doc, setDoc, getDoc, getDocs, writeBatch, increment } from 'firebase/firestore'
 import { useAuth } from '../contexts/AuthContext'
 import './TeamBuilder.css'
 import { useInjuries } from '../contexts/InjuriesContext'
@@ -258,6 +258,24 @@ export default function TeamBuilder(){
         payload.transferPointsDeduction = transferPointsDeduction + (transfersOverFree * 4)
       }
     }
+    // Compute transfer deltas against baseline and update player transfer metrics
+    try {
+      const added = selected.filter(id => !baseline.includes(id))
+      const removed = baseline.filter(id => !selected.includes(id))
+      if (added.length || removed.length) {
+        const batch = writeBatch(db)
+        for (const id of added) {
+          batch.set(doc(db,'players',id), { transfersIn: increment(1), updatedAt: Date.now() } as any, { merge: true })
+        }
+        for (const id of removed) {
+          batch.set(doc(db,'players',id), { transfersOut: increment(1), updatedAt: Date.now() } as any, { merge: true })
+        }
+        await batch.commit()
+      }
+    } catch (err) {
+      console.error('Failed to update player transfer metrics', err)
+    }
+
     await setDoc(doc(db,'teams',user.id), payload, { merge: true })
     setBaseline(selected); setBaselineCaptain(captainId); setBank(payload.bank); 
     if (payload.freeTransfers !== undefined) setFreeTransfers(payload.freeTransfers)
@@ -414,7 +432,7 @@ export default function TeamBuilder(){
             <div key={p.id} className={`card chip ${isDefenders ? 'chip--sm' : ''}`}>
               {captainId===p.id && (<div className="captain">C</div>)}
               <div className={`chip-name ${isDefenders ? 'chip-name--sm' : ''}`}>{p.name}{isInjured(p.id) ? ' 🚑' : ''}</div>
-              <div className="subtitle chip-pos">{p.position}</div>
+              <div className="subtitle chip-pos">{p.position} - £{p.price}M</div>
               <div className="chip-prev">Prev GW: {p.prevGwPoints}</div>
             </div>
           )

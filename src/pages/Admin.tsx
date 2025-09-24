@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { isAdmin } from '../config/adminEmails'
 import { useInjuries } from '../contexts/InjuriesContext'
 import { createTeamUpdateData } from '../lib/utils'
+import { updatePlayerPrice as dynUpdate } from './Pricing'
 
 const TEAMS: TeamCode[] = ['Men1','Men2','Men3','Men4','Men5']
 const POS: Position[] = ['GK','DEF','MID','FWD']
@@ -96,6 +97,11 @@ async function addPlayerLocal(){
                 yellow10Cards: 0,
                 redCards: 0,
                 manOfTheMatchCount: 0,
+				transfersIn: 0,
+				transfersOut: 0,
+				prevPerfDelta: 0,
+				pointsHistory: [],
+				matchesPlayed: 0,
                 createdAt: Date.now(),
                 updatedAt: Date.now()
             }
@@ -191,8 +197,8 @@ function updateGwChange(playerId: string, field: string, value: any) {
 				const changes = gwChanges[playerId]
 				const player = players.find(p => p.id === playerId)
 				if (!player) continue
-				
-            const updatedPlayer = {
+				const gwPts = calculatePoints(player, changes)
+				let updatedPlayer = {
 					...player,
 					goals: (Number(player.goals) || 0) + changes.goals,
 					cleanSheets: (Number(player.cleanSheets) || 0) + changes.cleanSheets,
@@ -201,9 +207,13 @@ function updateGwChange(playerId: string, field: string, value: any) {
                 	yellow10Cards: (Number((player as any).yellow10Cards) || 0) + changes.yellow10Cards,
 					redCards: (Number(player.redCards) || 0) + changes.redCards,
                 	manOfTheMatchCount: (Number((player as any).manOfTheMatchCount) || 0) + (changes.manOfTheMatch ? 1 : 0),
-                	pointsTotal: (Number(player.pointsTotal) || 0) + calculatePoints(player, changes),
+					pointsTotal: (Number(player.pointsTotal) || 0) + gwPts,
+					pointsHistory: [gwPts, ...(player.pointsHistory || [])],
+					matchesPlayed: (Number(player.matchesPlayed) || 0) + 1,
 					updatedAt: Date.now()
 				}
+				// Apply dynamic pricing using Pricing.ts (uses transfersIn/Out & performance history)
+				updatedPlayer = dynUpdate(updatedPlayer as any) as any
 				
 				batch.update(doc(db,'players',playerId), updatedPlayer as any)
 			}
@@ -358,6 +368,11 @@ function updateGwChange(playerId: string, field: string, value: any) {
 								yellow10Cards: 0,
 								redCards: 0,
 								manOfTheMatchCount: 0,
+								transfersIn: 0,
+								transfersOut: 0,
+								prevPerfDelta: 0,
+								pointsHistory: [],
+								matchesPlayed: 0,
 								createdAt: now,
 								updatedAt: now
 							}
