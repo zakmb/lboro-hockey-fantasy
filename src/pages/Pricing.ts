@@ -33,7 +33,7 @@ export type Player = {
 export const priceUnit = 0.1;
 export const minPrice = 5.0;
 export const maxPrice = 18.0;
-export const weeklyMaxChange = 1.0;
+export const weeklyMaxChange = 1.5;
 
 // demand
 export const riseThreshold = 20; // net transfers per PRICE_UNIT step

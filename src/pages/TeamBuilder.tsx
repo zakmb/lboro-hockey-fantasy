@@ -432,7 +432,7 @@ export default function TeamBuilder(){
             <div key={p.id} className={`card chip ${isDefenders ? 'chip--sm' : ''}`}>
               {captainId===p.id && (<div className="captain">C</div>)}
               <div className={`chip-name ${isDefenders ? 'chip-name--sm' : ''}`}>{p.name}{isInjured(p.id) ? ' 🚑' : ''}</div>
-              <div className="subtitle chip-pos">{p.position}</div>
+              <div className="subtitle chip-pos">{p.position} - £{p.price}M</div>
               <div className="chip-prev">Prev GW: {p.prevGwPoints}</div>
             </div>
           )
