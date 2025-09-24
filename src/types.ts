@@ -26,6 +26,12 @@ export interface Player {
 	redCards: number
 	createdAt: number
 	updatedAt: number
+    transfersIn: number;
+    transfersOut: number;
+    prevDemandDelta: number;
+    prevPerfDelta: number;
+    pointsHistory: number[]; // latest first, eg [gwThisWeek, gwLastWeek, ...]
+    matchesPlayed: number;
 }
 
 export interface UserProfile {
