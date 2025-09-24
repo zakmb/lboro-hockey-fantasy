@@ -12,7 +12,7 @@ const FORMATION = { GK: 1, DEF: 4, MID: 3, FWD: 3 } as const
 const BUDGET_LIMIT = 100
 
 function getDeadline(): Date {
-  const d = new Date(2025, 8, 6, 12, 0, 0, 0)
+  const d = new Date(2025, 8, 26, 21, 0, 0, 0)
   return d
 }
 
@@ -27,7 +27,6 @@ export default function TeamBuilder(){
   const [baselineCaptain, setBaselineCaptain] = useState<string>('')
   const [transfersEnabled, setTransfersEnabled] = useState<boolean>(false)
   const [deadline, setDeadline] = useState<Date>(getDeadline())
-  const [countdown, setCountdown] = useState<string>('')
   const [freeTransfers, setFreeTransfers] = useState<number>(1)
   const [wildcardUsed, setWildcardUsed] = useState<boolean>(false)
   const [wildcardPending, setWildcardPending] = useState<boolean>(false)
@@ -39,25 +38,12 @@ export default function TeamBuilder(){
   const [tripleCaptainPending, setTripleCaptainPending] = useState<boolean>(false)
   const [tripleCaptainConfirm, setTripleCaptainConfirm] = useState<boolean>(false)
 
-  useEffect(()=>{
-    const timer = setInterval(()=>{
-      const now = Date.now()
-      const diff = deadline.getTime() - now
-      if (diff <= 0) { setCountdown('Deadline passed'); return }
-      const d = Math.floor(diff/86400000)
-      const h = Math.floor((diff%86400000)/3600000)
-      const m = Math.floor((diff%3600000)/60000)
-      const s = Math.floor((diff%60000)/1000)
-      setCountdown(`${d}d ${h}h ${m}m ${s}s`)
-    }, 1000)
-    return ()=>clearInterval(timer)
-  },[deadline])
 
   useEffect(()=>{
     const unsubPlayers = onSnapshot(collection(db,'players'), snap=>{
       const list: Player[] = []
       snap.forEach(d=> list.push(d.data() as Player))
-      setPool(list.length? list : defaultPool())
+      setPool(list)
     })
     const unsubConfig = onSnapshot(doc(db,'config','league'), async (s)=>{
       const data = s.data() as any
@@ -122,20 +108,7 @@ export default function TeamBuilder(){
     return unsub
   },[user])
 
-  function defaultPool(): Player[] {
-    return Array.from({length:40}).map((_,i)=>({
-      id:'p'+i,
-      name:'Player '+(i+1),
-      team:TEAMS[i%5],
-      position:(['GK','DEF','MID','FWD'] as const)[i%4],
-      price:4+(i%6),
-      pointsTotal:0,
-      pointsGw:0,
-      prevGwPoints:0,
-      goals:0,assists:0,cleanSheets:0,greenCards:0,yellowCards:0,redCards:0,
-      createdAt:Date.now(),updatedAt:Date.now()
-    }))
-  }
+  // default player pool removed; pool now reflects DB only
 
   const selectedPlayers = selected.map(id=> pool.find(p=>p.id===id)!).filter(Boolean)
   const counts = useMemo(()=> selectedPlayers.reduce((acc,p)=>{(acc as any)[p.position]++;return acc},{GK:0,DEF:0,MID:0,FWD:0} as Record<Position,number>),[selectedPlayers])
@@ -156,17 +129,19 @@ export default function TeamBuilder(){
   },[baseline,selected])
 
   const liveFreeTransfers = useMemo(() => {
+    if (!afterDeadline) return '∞'
     if (wildcardPending) return '∞'
     if (baseline.length === 0) return freeTransfers
     return Math.max(0, freeTransfers - transfersUsed)
-  }, [freeTransfers, transfersUsed, wildcardPending, baseline.length])
+  }, [afterDeadline, freeTransfers, transfersUsed, wildcardPending, baseline.length])
 
   const liveTransferPointsDeduction = useMemo(() => {
+    if (!afterDeadline) return 0
     if (wildcardPending) return 0
     if (baseline.length === 0) return transferPointsDeduction
     const transfersOverFree = Math.max(0, transfersUsed - freeTransfers)
     return transferPointsDeduction + (transfersOverFree * 4)
-  }, [transfersUsed, freeTransfers, wildcardPending, baseline.length, transferPointsDeduction])
+  }, [afterDeadline, transfersUsed, freeTransfers, wildcardPending, baseline.length, transferPointsDeduction])
 
   const meetsFormation = (counts.GK===1 && counts.DEF===4 && counts.MID===3 && counts.FWD===3)
   const captainValid = captainId && selected.includes(captainId)
@@ -397,9 +372,7 @@ export default function TeamBuilder(){
         <div className="card-title-row">
           <h3>Team</h3>
           {!afterDeadline && (
-            <div className="subtitle badge-time" title="Transfer deadline">
-              {deadline.toLocaleDateString('en-GB')} 12:00 · {countdown || 'Deadline passed'}
-            </div>
+            <CountdownBadge deadline={deadline} />
           )}
         </div>
         <div className="spacer-12"/>
@@ -446,6 +419,32 @@ export default function TeamBuilder(){
             </div>
           )
         })}
+      </div>
+    )
+  }
+
+  function CountdownBadge({ deadline }: { deadline: Date }){
+    const [tick, setTick] = useState(0)
+    const [label, setLabel] = useState<string>('')
+    useEffect(()=>{
+      const compute = ()=>{
+        const now = Date.now()
+        const diff = deadline.getTime() - now
+        if (diff <= 0) { setLabel('Deadline passed'); return }
+        const d = Math.floor(diff/86400000)
+        const h = Math.floor((diff%86400000)/3600000)
+        const m = Math.floor((diff%3600000)/60000)
+        const s = Math.floor((diff%60000)/1000)
+        setLabel(`${d}d ${h}h ${m}m ${s}s`)
+      }
+      compute()
+      const id = setInterval(()=>{ setTick(v=>v+1); compute() }, 1000)
+      return ()=> clearInterval(id)
+    },[deadline])
+    const time = useMemo(()=> deadline.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), [deadline])
+    return (
+      <div className="subtitle badge-time" title="Transfer deadline" aria-live="polite">
+        {deadline.toLocaleDateString('en-GB')} {time} · {label || '—'}
       </div>
     )
   }

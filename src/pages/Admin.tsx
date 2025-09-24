@@ -29,8 +29,9 @@ export default function Admin(){
 	const [workingPlayers, setWorkingPlayers] = useState<Player[]>([])
 	const [form, setForm] = useState<{name:string,team:TeamCode,position:Position,price:number}>({name:'',team:'Men1',position:'MID',price:4})
 	const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())
-	const [gwChanges, setGwChanges] = useState<Record<string, {goals: number, assists: number, cleanSheets: number, greenCards: number, yellowCards: number, redCards: number}>>({})
+	const [gwChanges, setGwChanges] = useState<Record<string, {goals: number, cleanSheets: number, oneGoalConceded: boolean, greenCards: number, yellow5Cards: number, yellow10Cards: number, redCards: number, result: 'win'|'draw'|'loss'|'', manOfTheMatch: boolean}>>({})
 	const [injurySelectId, setInjurySelectId] = useState<string>('')
+	const [importText, setImportText] = useState<string>('')
 
 	useEffect(()=>{
 		const ref = doc(db,'config','league')
@@ -77,7 +78,7 @@ export default function Admin(){
 		return { ...player, price: newPrice }
 	}
 
-	async function addPlayerLocal(){
+async function addPlayerLocal(){
 		try {
             const p: Player = {
                 id: crypto.randomUUID(),
@@ -89,11 +90,12 @@ export default function Admin(){
                 pointsGw: 0,
                 prevGwPoints: 0,
                 goals: 0,
-                assists: 0,
                 cleanSheets: 0,
                 greenCards: 0,
-                yellowCards: 0,
+                yellow5Cards: 0,
+                yellow10Cards: 0,
                 redCards: 0,
+                manOfTheMatchCount: 0,
                 createdAt: Date.now(),
                 updatedAt: Date.now()
             }
@@ -108,41 +110,41 @@ export default function Admin(){
 		}
 	}
 
-	function calculatePoints(player: Player, changes: {goals: number, assists: number, cleanSheets: number, greenCards: number, yellowCards: number, redCards: number}): number {
+function calculatePoints(player: Player, changes: {goals: number, cleanSheets: number, oneGoalConceded: boolean, greenCards: number, yellow5Cards: number, yellow10Cards: number, redCards: number, result: 'win'|'draw'|'loss'|'', manOfTheMatch: boolean}): number {
 		let points = 0
-		
-		// Goals (position dependent)
-		if (player.position === 'DEF') points += changes.goals * 6
-		else if (player.position === 'MID' || player.position === 'FWD') points += changes.goals * 5
-		
-		// Assists
-		points += changes.assists * 3
-		
-		// Clean sheets (position dependent)
-		if (player.position === 'GK') points += changes.cleanSheets * 6
-		else if (player.position === 'DEF') points += changes.cleanSheets * 4
+		// Goals
+		if (player.position === 'FWD') points += changes.goals * 3
+		else if (player.position === 'MID') points += changes.goals * 4
+		else if (player.position === 'DEF' || player.position === 'GK') points += changes.goals * 5
+		// Clean sheets
+		if (player.position === 'GK') points += changes.cleanSheets * 10
+		else if (player.position === 'DEF') points += changes.cleanSheets * 8
 		else if (player.position === 'MID') points += changes.cleanSheets * 2
-		
-		// Cards
-		points += changes.greenCards * -1
-		points += changes.yellowCards * -2
-		points += changes.redCards * -3
-		
+    	// Cards
+		points += changes.greenCards * -2
+		points += changes.yellow5Cards * -4
+		points += changes.yellow10Cards * -8
+		points += changes.redCards * -15
+		// Result
+		if (changes.result === 'win') points += 3
+		else if (changes.result === 'draw') points += 1
+		// Man of the match
+		if (changes.manOfTheMatch) points += 5
 		return points
 	}
 
-	function updateGwChange(playerId: string, field: string, value: number) {
+function updateGwChange(playerId: string, field: string, value: any) {
 		setGwChanges(prev => {
-			const current = prev[playerId] || {goals: 0, assists: 0, cleanSheets: 0, greenCards: 0, yellowCards: 0, redCards: 0}
+        const current = prev[playerId] || {goals: 0, cleanSheets: 0, greenCards: 0, yellow5Cards: 0, yellow10Cards: 0, redCards: 0, result: '', manOfTheMatch: false}
 			const updated = { ...current, [field]: value }
 			return { ...prev, [playerId]: updated }
 		})
 		
 		// Update working players with new points after state update
-		setTimeout(() => {
-			setWorkingPlayers(prev => prev.map(p => {
+        setTimeout(() => {
+            setWorkingPlayers(prev => prev.map(p => {
 				if (p.id !== playerId) return p
-				const changes = { ...(gwChanges[playerId] || {goals: 0, assists: 0, cleanSheets: 0, greenCards: 0, yellowCards: 0, redCards: 0}), [field]: value }
+                const changes = { ...(gwChanges[playerId] || {goals: 0, cleanSheets: 0, greenCards: 0, yellow5Cards: 0, yellow10Cards: 0, redCards: 0, result: '', manOfTheMatch: false}), [field]: value }
 				const gwPoints = calculatePoints(p, changes)
 				const originalTotal = Number(p.pointsTotal) || 0
 				const originalGw = Number(p.pointsGw) || 0
@@ -190,15 +192,16 @@ export default function Admin(){
 				const player = players.find(p => p.id === playerId)
 				if (!player) continue
 				
-				const updatedPlayer = {
+            const updatedPlayer = {
 					...player,
 					goals: (Number(player.goals) || 0) + changes.goals,
-					assists: (Number(player.assists) || 0) + changes.assists,
 					cleanSheets: (Number(player.cleanSheets) || 0) + changes.cleanSheets,
 					greenCards: (Number(player.greenCards) || 0) + changes.greenCards,
-					yellowCards: (Number(player.yellowCards) || 0) + changes.yellowCards,
+                	yellow5Cards: (Number((player as any).yellow5Cards) || 0) + changes.yellow5Cards,
+                	yellow10Cards: (Number((player as any).yellow10Cards) || 0) + changes.yellow10Cards,
 					redCards: (Number(player.redCards) || 0) + changes.redCards,
-					pointsTotal: (Number(player.pointsTotal) || 0) + changes.goals * (player.position === 'DEF' ? 6 : 5) + changes.assists * 3 + changes.cleanSheets * (player.position === 'GK' ? 6 : player.position === 'DEF' ? 4 : 2) + changes.greenCards * -1 + changes.yellowCards * -2 + changes.redCards * -3,
+                	manOfTheMatchCount: (Number((player as any).manOfTheMatchCount) || 0) + (changes.manOfTheMatch ? 1 : 0),
+                	pointsTotal: (Number(player.pointsTotal) || 0) + calculatePoints(player, changes),
 					updatedAt: Date.now()
 				}
 				
@@ -235,11 +238,17 @@ export default function Admin(){
 				const transferDeduction = Number(t.transferPointsDeduction) || 0
 				
 				const total = (Number(t.teamPointsTotal)||0) + gw - transferDeduction
+				const now = new Date()
+				const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`
+				const prevMonthly = (t.monthlyPoints && typeof t.monthlyPoints === 'object') ? t.monthlyPoints : {}
+				const currentMonthPoints = Number(prevMonthly?.[ym]) || 0
+				const nextMonthly = { ...prevMonthly, [ym]: currentMonthPoints + (gw - transferDeduction) }
 				const updateData: any = { 
 					teamPrevGwPoints: gw, 
 					teamPointsTotal: total, 
 					updatedAt: Date.now(),
-					transferPointsDeduction: 0 // Reset to 0 after applying deductions
+					transferPointsDeduction: 0, // Reset to 0 after applying deductions
+					monthlyPoints: nextMonthly
 				}
 				
 				if (triplePending) {
@@ -274,6 +283,98 @@ export default function Admin(){
 					<input type="checkbox" checked={transfersEnabled} onChange={e=>toggleTransfers(e.target.checked)} />
 					Enable Transfers
 				</label>
+			</div>
+
+			{/* Bulk Import */}
+			<div className="card">
+				<h3>Bulk Import Players</h3>
+				<p className="text-sm" style={{marginTop:4}}>Paste or upload text in sections per team, e.g.:</p>
+				<textarea className="input" style={{height:180, marginTop:8}} placeholder={"Paste squads..."} value={importText} onChange={e=>setImportText(e.target.value)} />
+				<div style={{height:8}}/>
+				<button className="btn" onClick={async()=>{
+					try{
+						const lines = importText.split(/\r?\n/)
+						if(lines.length===0){ alert('No input provided'); return }
+						const teamHeaderRegex = /^(?:men'?s\s*)?(1|2|3|4|5)\s*$/i
+						let currentTeam: TeamCode | null = null
+						const toCreate: Player[] = []
+						const now = Date.now()
+						const dragflickers = new Set(['spreckers','tarzan','shoey','finney','shareef','lee','schooner','haslam','skid','rdot','smithy','bb'])
+						function isDragflicker(name:string){
+							const n=name.toLowerCase()
+							for(const nick of dragflickers){ if(n.localeCompare(nick)===0) return true }
+							return false
+						}
+						function normPos(raw:string): Position | null {
+							const s = raw.trim().toUpperCase()
+							if(s==='GK' || s==='DEF' || s==='MID' || s==='FWD') return s as Position
+							return null
+						}
+						function basePrice(team:TeamCode, pos:Position): number {
+							switch(team){
+								case 'Men1': return (pos==='MID'?8: pos==='FWD'?10: 6)
+								case 'Men2': return (pos==='MID'?10: pos==='FWD'?12: 8)
+								case 'Men3': return (pos==='MID'?7: pos==='FWD'?9: 5)
+								case 'Men4': return (pos==='MID'?11: pos==='FWD'?13: 9)
+								case 'Men5': return (pos==='GK'?6: pos==='DEF'?10: pos==='MID'?12: 14)
+							}
+						}
+						function randomAdjust(): number {
+							const n = Math.floor(Math.random()*3) - 1 // -1, 0, or 1
+							return n * 0.5
+						}
+						for(const raw of lines){
+							const line = raw.trim()
+							if(!line) continue
+							const th = teamHeaderRegex.exec(line)
+							if(th){
+								const idx = th[1]
+								currentTeam = (`Men${idx}`) as TeamCode
+								continue
+							}
+							if(!currentTeam) continue
+							const parts = line.split(/\s+-\s+|,|\t|\s{2,}/).map(s=>s.trim()).filter(Boolean)
+							if(parts.length<2) continue
+							const name = parts[0]
+							const posRaw = parts.slice(1).join(' ')
+							const pos = normPos(posRaw)
+							if(!pos) continue
+							let price = basePrice(currentTeam, pos)
+							if(isDragflicker(name)) price += 2
+							price += randomAdjust()
+							const p: Player = {
+								id: crypto.randomUUID(),
+								name,
+								team: currentTeam,
+								position: pos,
+								price,
+								pointsTotal: 0,
+								pointsGw: 0,
+								prevGwPoints: 0,
+								goals: 0,
+								cleanSheets: 0,
+								greenCards: 0,
+								yellow5Cards: 0,
+								yellow10Cards: 0,
+								redCards: 0,
+								manOfTheMatchCount: 0,
+								createdAt: now,
+								updatedAt: now
+							}
+							toCreate.push(p)
+						}
+						if(toCreate.length===0){ alert('No valid players found to import.'); return }
+						const batch = writeBatch(db)
+						for(const p of toCreate){ batch.set(doc(db,'players',p.id), p as any) }
+						await batch.commit()
+						setPlayers(prev=>[...prev, ...toCreate])
+						setWorkingPlayers(prev=>[...prev, ...toCreate])
+						alert(`Imported ${toCreate.length} players successfully.`)
+					}catch(err){
+						console.error(err)
+						alert(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+					}
+				}}>Import Players</button>
 			</div>
 
 			<div className="card">
@@ -347,7 +448,7 @@ export default function Admin(){
 														</div>
 													</div>
 													<div className="fields-grid">
-														{p.position !== 'GK' && (
+                                                    {p.position !== 'GK' && (
 															<div>
 																<label className="field-label">Goals</label>
 																<select className="input" value={gwChanges[p.id]?.goals || 0} onChange={(e) => updateGwChange(p.id, 'goals', parseInt(e.target.value))}>
@@ -355,15 +456,7 @@ export default function Admin(){
 																</select>
 															</div>
 														)}
-														{p.position !== 'GK' && (
-															<div>
-																<label className="field-label">Assists</label>
-																<select className="input" value={gwChanges[p.id]?.assists || 0} onChange={(e) => updateGwChange(p.id, 'assists', parseInt(e.target.value))}>
-																	{Array.from({length: 11}, (_, i) => <option key={i} value={i}>{i}</option>)}
-																</select>
-															</div>
-														)}
-														{p.position !== 'FWD' && (
+                                                    	{p.position !== 'FWD' && (
 															<div>
 																<label className="field-label">Clean Sheet</label>
 																<label className="checkbox-tile">
@@ -384,17 +477,44 @@ export default function Admin(){
 															</select>
 														</div>
 														<div>
-															<label className="field-label">Yellow Cards</label>
-															<select className="input" value={gwChanges[p.id]?.yellowCards || 0} onChange={(e) => updateGwChange(p.id, 'yellowCards', parseInt(e.target.value))}>
-																{Array.from({length: 3}, (_, i) => <option key={i} value={i}>{i}</option>)}
-															</select>
+                                                        <label className="field-label">Yellow 5 min</label>
+                                                        <select className="input" value={gwChanges[p.id]?.yellow5Cards || 0} onChange={(e) => updateGwChange(p.id, 'yellow5Cards', parseInt(e.target.value))}>
+                                                            {Array.from({length: 3}, (_, i) => <option key={i} value={i}>{i}</option>)}
+                                                        </select>
 														</div>
 														<div>
+                                                        <label className="field-label">Yellow 10 min</label>
+                                                        <select className="input" value={gwChanges[p.id]?.yellow10Cards || 0} onChange={(e) => updateGwChange(p.id, 'yellow10Cards', parseInt(e.target.value))}>
+                                                            {Array.from({length: 3}, (_, i) => <option key={i} value={i}>{i}</option>)}
+                                                        </select>
+                                                    </div>
+                                                    <div>
 															<label className="field-label">Red Cards</label>
 															<select className="input" value={gwChanges[p.id]?.redCards || 0} onChange={(e) => updateGwChange(p.id, 'redCards', parseInt(e.target.value))}>
 																{Array.from({length: 2}, (_, i) => <option key={i} value={i}>{i}</option>)}
 															</select>
 														</div>
+                                                    <div>
+                                                        <label className="field-label">Result</label>
+                                                        <select className="input" value={gwChanges[p.id]?.result || ''} onChange={(e) => updateGwChange(p.id, 'result', e.target.value as any)}>
+                                                            <option value="">Select result</option>
+                                                            <option value="win">Win</option>
+                                                            <option value="draw">Draw</option>
+                                                            <option value="loss">Loss</option>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className="field-label">Man of the Match</label>
+                                                        <label className="checkbox-tile">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={!!gwChanges[p.id]?.manOfTheMatch}
+                                                                onChange={(e) => updateGwChange(p.id, 'manOfTheMatch', e.target.checked)}
+                                                                style={{margin: 0}}
+                                                            />
+                                                            <span className="text-sm">Yes</span>
+                                                        </label>
+                                                    </div>
 													</div>
 												</div>
 											))}
