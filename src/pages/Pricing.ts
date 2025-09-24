@@ -30,23 +30,24 @@ export type Player = {
     matchesPlayed?: number;
 };
 
+// core price mechanics
 export const priceUnit = 0.1;
 export const minPrice = 5.0;
 export const maxPrice = 18.0;
-export const weeklyMaxChange = 1.0;
+export const weeklyMaxChange = 1.4;
 
 // demand
-export const riseThreshold = 30; // net transfers per PRICE_UNIT step
-export const alphaDemand = 0.3;  // EMA
+export const riseThreshold = 8;   
+export const alphaDemand = 0.6;    
 
 // performance
-export const lookbackMatched = 4;
-export const kPerf = 0.05; // price units per PPG diff
-export const alphaPerf = 0.4;     // EMA
+export const lookbackMatched = 2;
+export const kPerf = 0.1;         
+export const alphaPerf = 0.7;      
 
-// hybrid
-export const wDemand = 0.6;
-export const wPerf = 0.4;
+// hybrid weighting
+export const wDemand = 0.4;       
+export const wPerf = 0.6;        
 
 export function clamp(value: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, value));
@@ -139,7 +140,7 @@ export function updatePlayerPrice(playerIn: Player): Player {
     let newPrice = (player.price ?? minPrice) + rawDelta;
     newPrice = roundToNearest(newPrice, priceUnit);
     newPrice = clamp(newPrice, minPrice, maxPrice);
-    newPrice = Math.round(newPrice * 10) / 10;
+    newPrice = Number(newPrice.toFixed(1));
 
     const updated: Player = {
         ...player,
