@@ -36,7 +36,7 @@ export const maxPrice = 18.0;
 export const weeklyMaxChange = 1.0;
 
 // demand
-export const riseThreshold = 20; // net transfers per PRICE_UNIT step
+export const riseThreshold = 30; // net transfers per PRICE_UNIT step
 export const alphaDemand = 0.3;  // EMA
 
 // performance
