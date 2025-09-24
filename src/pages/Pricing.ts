@@ -25,19 +25,18 @@ export type Player = {
 
     transfersIn?: number;
     transfersOut?: number;
-    prevDemandDelta?: number;
     prevPerfDelta?: number;
     pointsHistory?: number[];
     matchesPlayed?: number;
 };
 
 export const priceUnit = 0.1;
-export const minPrice = 3.0;
-export const maxPrice = 12.0;
-export const weeklyMaxChange = 0.5;
+export const minPrice = 5.0;
+export const maxPrice = 18.0;
+export const weeklyMaxChange = 1.0;
 
 // demand
-export const riseThreshold = 50; // net transfers per PRICE_UNIT step
+export const riseThreshold = 20; // net transfers per PRICE_UNIT step
 export const alphaDemand = 0.3;  // EMA
 
 // performance
@@ -84,7 +83,6 @@ export function defaultPool(): Player[] {
 
         transfersIn: 0,
         transfersOut: 0,
-        prevDemandDelta: 0,
         prevPerfDelta: 0,
         pointsHistory: [],
         matchesPlayed: 0
@@ -114,7 +112,6 @@ export function updatePlayerPrice(playerIn: Player): Player {
 
     player.transfersIn = player.transfersIn ?? 0;
     player.transfersOut = player.transfersOut ?? 0;
-    player.prevDemandDelta = player.prevDemandDelta ?? 0;
     player.prevPerfDelta = player.prevPerfDelta ?? 0;
     player.pointsHistory = player.pointsHistory ?? [];
     player.matchesPlayed = player.matchesPlayed ?? 0;
@@ -123,7 +120,7 @@ export function updatePlayerPrice(playerIn: Player): Player {
     const net = (player.transfersIn ?? 0) - (player.transfersOut ?? 0);
     const demandSteps = Math.floor(net / riseThreshold);
     let demandDelta = demandSteps * priceUnit;
-    demandDelta = alphaDemand * demandDelta + (1 - alphaDemand) * (player.prevDemandDelta ?? 0);
+    demandDelta = alphaDemand * demandDelta + (1 - alphaDemand) * net;
 
     // Performance
     const recentSlice = (player.pointsHistory ?? []).slice(0, lookbackMatched);
@@ -146,7 +143,6 @@ export function updatePlayerPrice(playerIn: Player): Player {
     const updated: Player = {
         ...player,
         price: newPrice,
-        prevDemandDelta: demandDelta,
         prevPerfDelta: perfDelta,
         transfersIn: 0,
         transfersOut: 0,
