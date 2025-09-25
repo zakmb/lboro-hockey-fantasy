@@ -43,7 +43,7 @@ export const alphaDemand = 0.6;
 // performance
 export const lookbackMatched = 4;
 export const kPerf = 0.1;         
-export const alphaPerf = 0.4;      
+export const alphaPerf = 0.6;      
 
 // hybrid weighting
 export const wDemand = 0.6;       
