@@ -30,9 +30,32 @@ export default function Admin(){
 	const [workingPlayers, setWorkingPlayers] = useState<Player[]>([])
 	const [form, setForm] = useState<{name:string,team:TeamCode,position:Position,price:number}>({name:'',team:'Men1',position:'MID',price:4})
 	const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())
-	const [gwChanges, setGwChanges] = useState<Record<string, {goals: number, cleanSheets: number, oneGoalConceded: boolean, greenCards: number, yellow5Cards: number, yellow10Cards: number, redCards: number, result: 'win'|'draw'|'loss'|'', manOfTheMatch: boolean}>>({})
+	const [gwChanges, setGwChanges] = useState<Record<string, {goals: number, cleanSheets: number, greenCards: number, yellow5Cards: number, yellow10Cards: number, redCards: number, result: 'win'|'draw'|'loss'|'', manOfTheMatch: boolean}>>({})
 	const [injurySelectId, setInjurySelectId] = useState<string>('')
 	const [importText, setImportText] = useState<string>('')
+
+	// Add new state for bulk updates
+	const [bulkUpdate, setBulkUpdate] = useState<{
+		playersList: string,
+		result: 'win'|'draw'|'loss'|'',
+		goalScorers: string,
+		greenCards: string,
+		yellow5Cards: string,
+		yellow10Cards: string,
+		redCards: string,
+		motm: string,
+		cleanSheet: boolean  // Add this line
+	}>({
+		playersList: '',
+		result: '',
+		goalScorers: '',
+		greenCards: '',
+		yellow5Cards: '',
+		yellow10Cards: '',
+		redCards: '',
+		motm: '',
+		cleanSheet: false  // Add this line
+	})
 
 	useEffect(()=>{
 		const ref = doc(db,'config','league')
@@ -116,7 +139,7 @@ async function addPlayerLocal(){
 		}
 	}
 
-function calculatePoints(player: Player, changes: {goals: number, cleanSheets: number, oneGoalConceded: boolean, greenCards: number, yellow5Cards: number, yellow10Cards: number, redCards: number, result: 'win'|'draw'|'loss'|'', manOfTheMatch: boolean}): number {
+	function calculatePoints(player: Player, changes: {goals: number, cleanSheets: number, greenCards: number, yellow5Cards: number, yellow10Cards: number, redCards: number, result: 'win'|'draw'|'loss'|'', manOfTheMatch: boolean}): number {
 		let points = 0
 		// Goals
 		if (player.position === 'FWD') points += changes.goals * 3
@@ -139,7 +162,7 @@ function calculatePoints(player: Player, changes: {goals: number, cleanSheets: n
 		return points
 	}
 
-function updateGwChange(playerId: string, field: string, value: any) {
+	function updateGwChange(playerId: string, field: string, value: any) {
 		setGwChanges(prev => {
         const current = prev[playerId] || {goals: 0, cleanSheets: 0, greenCards: 0, yellow5Cards: 0, yellow10Cards: 0, redCards: 0, result: '', manOfTheMatch: false}
 			const updated = { ...current, [field]: value }
@@ -431,6 +454,244 @@ function updateGwChange(playerId: string, field: string, value: any) {
 							<button className="btn secondary" onClick={()=>clearInjured(p.id)}>Remove</button>
 						</div>
 					))}
+				</div>
+			</div>
+
+			<div className="bulkAddPoints">
+				<h3>Bulk Add Points</h3>
+				<div className="grid" style={{gap: 12}}>
+					<div>
+						<label className="field-label">Players List (one per line)</label>
+						<textarea 
+							className="input" 
+							style={{height: 100}} 
+							value={bulkUpdate.playersList} 
+							onChange={e => setBulkUpdate(prev => ({...prev, playersList: e.target.value}))}
+							placeholder="Enter player names, one per line..."
+						/>
+					</div>
+					<div className="grid" style={{gridTemplateColumns: '1fr 1fr 1fr'}}>
+						<div>
+							<label className="field-label">Result</label>
+							<select 
+								className="input"
+								value={bulkUpdate.result}
+								onChange={e => setBulkUpdate(prev => ({...prev, result: e.target.value as any}))}
+							>
+								<option value="">Select result</option>
+								<option value="win">Win</option>
+								<option value="draw">Draw</option>
+								<option value="loss">Loss</option>
+							</select>
+						</div>
+						<div>
+							<label className="field-label">Clean Sheet</label>
+							<label className="checkbox-tile">
+								<input 
+									type="checkbox"
+									checked={bulkUpdate.cleanSheet}
+									onChange={e => setBulkUpdate(prev => ({...prev, cleanSheet: e.target.checked}))}
+									style={{margin: 0}}
+								/>
+								<span className="text-sm">Yes (applies to GK/DEF/MID)</span>
+							</label>
+						</div>
+						<div>
+							<label className="field-label">Man of the Match</label>
+							<input 
+								className="input"
+								value={bulkUpdate.motm}
+								onChange={e => setBulkUpdate(prev => ({...prev, motm: e.target.value}))}
+								placeholder="MOTM name..."
+							/>
+						</div>
+					</div>
+					<div className="grid" style={{gridTemplateColumns: '1fr 1fr 1fr 1fr'}}>
+						<div>
+							<label className="field-label">Goals (name xNumber of Goals for multiple)</label>
+							<textarea 
+								className="input"
+								style={{height: 60}}
+								value={bulkUpdate.goalScorers}
+								onChange={e => setBulkUpdate(prev => ({...prev, goalScorers: e.target.value}))}
+								placeholder="Scorer x2..."
+							/>
+						</div>
+						<div>
+							<label className="field-label">Green Cards</label>
+							<textarea 
+								className="input"
+								style={{height: 60}}
+								value={bulkUpdate.greenCards}
+								onChange={e => setBulkUpdate(prev => ({...prev, greenCards: e.target.value}))}
+								placeholder="Name x2..."
+							/>
+						</div>
+						<div>
+							<label className="field-label">Yellow 5min</label>
+							<textarea 
+								className="input"
+								style={{height: 60}}
+								value={bulkUpdate.yellow5Cards}
+								onChange={e => setBulkUpdate(prev => ({...prev, yellow5Cards: e.target.value}))}
+								placeholder="Name x2..."
+							/>
+						</div>
+						<div>
+							<label className="field-label">Yellow 10min</label>
+							<textarea 
+								className="input"
+								style={{height: 60}}
+								value={bulkUpdate.yellow10Cards}
+								onChange={e => setBulkUpdate(prev => ({...prev, yellow10Cards: e.target.value}))}
+								placeholder="Name x2..."
+							/>
+						</div>
+						<div>
+							<label className="field-label">Red Cards</label>
+							<textarea 
+								className="input"
+								style={{height: 60}}
+								value={bulkUpdate.redCards}
+								onChange={e => setBulkUpdate(prev => ({...prev, redCards: e.target.value}))}
+								placeholder="Name..."
+							/>
+						</div>
+					</div>
+					<button 
+						className="btn"
+						onClick={() => {
+							// Validate player names first
+                            const playerNames = bulkUpdate.playersList.split('\n')
+                                .map(n => n.trim())
+                                .filter(Boolean);
+
+							if (playerNames.length === 0) {
+								alert('Please enter at least one player in the Players List.');
+								return;
+							}
+
+							if (bulkUpdate.result === '') {
+								alert('Please select a match result (win, draw, loss).');
+								return;
+							}
+                            
+                            const invalidPlayers = playerNames.filter(name => 
+                                !workingPlayers.some(p => p.name.toLowerCase() === name.toLowerCase())
+                            );
+
+                            if (invalidPlayers.length > 0) {
+                                alert(`The following players were not found in the database:\n${invalidPlayers.join('\n')}`);
+                                return;
+                            }
+
+                            // Parse names and validate they exist in playersList
+                            function parseAndValidateNames(input: string, field: string): [Record<string, number>, string[]] {
+                                const result: Record<string, number> = {};
+                                const invalidNames: string[] = [];
+                                const lines = input.split('\n')
+                                    .map(line => line.trim())
+                                    .filter(Boolean);
+                                
+                                for (const line of lines) {
+									//Check it matches "name xNumber" or just "name" format and extract
+                                    const match = line.toLowerCase().match(/^(.*?)(?:\s*x\s*(\d+))?$/);
+                                    if (match) {
+                                        const [_, name, quantity] = match;
+                                        const cleanName = name.trim();
+                                        if (cleanName) {
+                                            // Check if player exists in playersList
+                                            if (!playerNames.some(n => n.toLowerCase() === cleanName)) {
+                                                invalidNames.push(cleanName);
+                                            } else {
+                                                result[cleanName] = (result[cleanName] || 0) + (quantity ? parseInt(quantity) : 1);
+                                            }
+                                        }
+                                    }
+                                }
+                                return [result, invalidNames];
+                            }
+
+                            // Validate all inputs
+                            const [goalScorers, invalidGoalScorers] = parseAndValidateNames(bulkUpdate.goalScorers, 'goals');
+                            const [greenCards, invalidGreenCards] = parseAndValidateNames(bulkUpdate.greenCards, 'green cards');
+                            const [yellow5Cards, invalidYellow5] = parseAndValidateNames(bulkUpdate.yellow5Cards, 'yellow 5min');
+                            const [yellow10Cards, invalidYellow10] = parseAndValidateNames(bulkUpdate.yellow10Cards, 'yellow 10min');
+                            const [redCards, invalidRedCards] = parseAndValidateNames(bulkUpdate.redCards, 'red cards');
+                            
+                            const motm = bulkUpdate.motm.trim();
+                            const invalidMotm = motm && !playerNames.some(n => n.toLowerCase() === motm.toLowerCase());
+
+                            // Collect all validation errors
+                            const errors: string[] = [];
+                            if (invalidGoalScorers.length) errors.push(`Goals: ${invalidGoalScorers.join(', ')}`);
+                            if (invalidGreenCards.length) errors.push(`Green cards: ${invalidGreenCards.join(', ')}`);
+                            if (invalidYellow5.length) errors.push(`Yellow 5min: ${invalidYellow5.join(', ')}`);
+                            if (invalidYellow10.length) errors.push(`Yellow 10min: ${invalidYellow10.join(', ')}`);
+                            if (invalidRedCards.length) errors.push(`Red cards: ${invalidRedCards.join(', ')}`);
+                            if (invalidMotm) errors.push(`Man of the Match: ${motm}`);
+
+                            if (errors.length > 0) {
+                                alert(`The following players were not in the player list:\n\n${errors.join('\n')}`);
+                                return;
+                            }
+
+                            const newChanges = {...gwChanges};
+                            for (const name of playerNames) {
+                                const player = workingPlayers.find(p => p.name.toLowerCase() === name.toLowerCase());
+                                if (!player) continue;
+
+                                const changes = {
+                                    goals: goalScorers[name.toLowerCase()] || 0,
+                                    cleanSheets: (player.position !== 'FWD' && bulkUpdate.cleanSheet) ? 1 : 0,
+                                    greenCards: greenCards[name.toLowerCase()] || 0,
+                                    yellow5Cards: yellow5Cards[name.toLowerCase()] || 0,
+                                    yellow10Cards: yellow10Cards[name.toLowerCase()] || 0,
+                                    redCards: redCards[name.toLowerCase()] || 0,
+                                    result: bulkUpdate.result,
+                                    manOfTheMatch: motm.toLowerCase() === name.toLowerCase()
+                                };
+
+                                newChanges[player.id] = changes;
+
+                                // Calculate and update points immediately
+                                const gwPoints = calculatePoints(player, changes);
+                                const originalTotal = Number(player.pointsTotal) || 0;
+                                const originalGw = Number(player.pointsGw) || 0;
+                                const newTotal = originalTotal - originalGw + gwPoints;
+
+                                setWorkingPlayers(prev => prev.map(p => {
+                                    if (p.id !== player.id) return p;
+                                    return {
+                                        ...p,
+                                        pointsGw: gwPoints,
+                                        pointsTotal: newTotal,
+                                        updatedAt: Date.now()
+                                    };
+                                }));
+                            }
+
+                            // Update the GW changes
+                            setGwChanges(newChanges);
+							
+							// Clear the form
+							setBulkUpdate({
+								playersList: '',
+								result: '',
+								goalScorers: '',
+								greenCards: '',
+								yellow5Cards: '',
+								yellow10Cards: '',
+								redCards: '',
+								motm: '',
+								cleanSheet: false,  // Add to form reset
+							});
+
+							alert('Bulk update applied! Review the changes below before finalizing.');
+						}}
+					>
+						Apply Bulk Update
+					</button>
 				</div>
 			</div>
 
