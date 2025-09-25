@@ -129,7 +129,7 @@ export function updatePlayerPrice(playerIn: Player): Player {
     console.log(player.matchesPlayed);
     const recentPPG = recentSlice.length > 0 ? average(recentSlice) : average([player.pointsGw || 0, player.prevGwPoints || 0]);
     const baselinePPG =
-        (player.matchesPlayed && player.matchesPlayed > 1) ? (player.pointsTotal ?? 0) / player.matchesPlayed : 3;
+        (player.matchesPlayed && player.matchesPlayed > 1) ? (player.pointsTotal ?? 0) / player.matchesPlayed : 5;
 
     console.log({ recentPPG, baselinePPG });
 
