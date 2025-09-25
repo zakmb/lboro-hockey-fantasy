@@ -41,13 +41,13 @@ export const riseThreshold = 8;
 export const alphaDemand = 0.6;    
 
 // performance
-export const lookbackMatched = 2;
+export const lookbackMatched = 4;
 export const kPerf = 0.1;         
-export const alphaPerf = 0.7;      
+export const alphaPerf = 0.4;      
 
 // hybrid weighting
-export const wDemand = 0.4;       
-export const wPerf = 0.6;        
+export const wDemand = 0.6;       
+export const wPerf = 0.4;        
 
 export function clamp(value: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, value));
@@ -127,14 +127,15 @@ export function updatePlayerPrice(playerIn: Player): Player {
     const recentSlice = (player.pointsHistory ?? []).slice(0, lookbackMatched);
     const recentPPG = recentSlice.length > 0 ? average(recentSlice) : average([player.pointsGw || 0, player.prevGwPoints || 0]);
     const baselinePPG =
-        (player.matchesPlayed && player.matchesPlayed > 0) ? (player.pointsTotal ?? 0) / player.matchesPlayed : 0;
+        (player.matchesPlayed && player.matchesPlayed > 1) ? (player.pointsTotal ?? 0) / player.matchesPlayed : 5;
+
 
     const perfDiff = recentPPG - baselinePPG;
     let perfDelta = kPerf * perfDiff;
     perfDelta = alphaPerf * perfDelta + (1 - alphaPerf) * (player.prevPerfDelta ?? 0);
 
     // Hybrid
-    let rawDelta = wDemand * demandDelta + wPerf * perfDelta;
+    let rawDelta = (player.matchesPlayed && player.matchesPlayed > 1) ? wDemand * demandDelta + wPerf * perfDelta : perfDelta;
     rawDelta = clamp(rawDelta, -weeklyMaxChange, weeklyMaxChange);
 
     let newPrice = (player.price ?? minPrice) + rawDelta;
