@@ -37,6 +37,8 @@ export default function TeamBuilder(){
   const [tripleCaptainUsed, setTripleCaptainUsed] = useState<boolean>(false)
   const [tripleCaptainPending, setTripleCaptainPending] = useState<boolean>(false)
   const [tripleCaptainConfirm, setTripleCaptainConfirm] = useState<boolean>(false)
+  const [totalPoints, setTotalPoints] = useState<number>(0)
+  const [gwPoints, setGwPoints] = useState<number>(0)
 
 
   useEffect(()=>{
@@ -89,6 +91,10 @@ export default function TeamBuilder(){
       else setBank(100)
       if (data?.tripleCaptainUsed !== undefined) setTripleCaptainUsed(!!data.tripleCaptainUsed)
       if (data?.tripleCaptainPending !== undefined) setTripleCaptainPending(!!data.tripleCaptainPending)
+      if (typeof data?.teamPointsTotal === 'number') setTotalPoints(data.teamPointsTotal)
+      else setTotalPoints(100)
+      if (typeof data?.teamPrevGwPoints === 'number') setGwPoints(data.teamPrevGwPoints)
+      else setGwPoints(0)
     })
     const unsub = onSnapshot(ref,(s)=>{
       const data = s.data() as any
@@ -104,6 +110,10 @@ export default function TeamBuilder(){
       else setBank(100)
       if (data?.tripleCaptainUsed !== undefined) setTripleCaptainUsed(!!data.tripleCaptainUsed)
       if (data?.tripleCaptainPending !== undefined) setTripleCaptainPending(!!data.tripleCaptainPending)
+      if (typeof data?.teamPointsTotal === 'number') setTotalPoints(data.teamPointsTotal)
+      else setTotalPoints(100)
+      if (typeof data?.teamPrevGwPoints === 'number') setGwPoints(data.teamPrevGwPoints)
+      else setGwPoints(0)
     })
     return unsub
   },[user])
@@ -477,15 +487,32 @@ export default function TeamBuilder(){
           </div>
         )}
         <FormationPitch />
+
+        <PosList pos="GK" title="Goalkeepers" />
+        <PosList pos="DEF" title="Defenders" />
+        <PosList pos="MID" title="Midfielders" />
+        <PosList pos="FWD" title="Forwards" />
         
       </div>
 
       <div className="right">
 
         <div className="card">
-          <div className="budget-row">
+          <div className="card-row">
+            <div className="subtitle">Total Points</div>
+            <div className="row-data" aria-live="polite">{totalPoints}</div>
+          </div>
+          <br/>
+          <div className="card-row">
+            <div className="subtitle">Previous GW Points</div>
+            <div className="row-data" aria-live="polite">{gwPoints}</div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-row">
             <div className="subtitle">Budget</div>
-            <div className="budget-amount" aria-live="polite">£{bank.toFixed(1)}M</div>
+            <div className="row-data" aria-live="polite">£{bank.toFixed(1)}M</div>
           </div>
           
         <br/>
@@ -579,14 +606,14 @@ export default function TeamBuilder(){
           
           <div className="grid" style={{gridTemplateColumns:'1fr auto', alignItems:'center'}}>
             <div className="subtitle">Free Transfers</div>
-            <div className="budget-amount">{liveFreeTransfers}</div>
+            <div className="row-data">{liveFreeTransfers}</div>
           </div>
 
           <br/>
           
           <div className="grid" style={{gridTemplateColumns:'1fr auto', alignItems:'center'}}>
             <div className="subtitle">Gameweeks Point Deduction</div>
-            <div className="budget-amount" style={{color: liveTransferPointsDeduction > 0 ? 'var(--color-red)' : 'var(--muted)'}}>
+            <div className="row-data" style={{color: liveTransferPointsDeduction > 0 ? 'var(--color-red)' : 'var(--muted)'}}>
               {liveTransferPointsDeduction > 0 ? `-${liveTransferPointsDeduction}` : '0'}
             </div>
           </div>
@@ -626,11 +653,6 @@ export default function TeamBuilder(){
             <button disabled={!hasChanges} className="btn secondary" onClick={resetTeam}>Reset</button>
           </div>
         </div>
-
-        <PosList pos="GK" title="Goalkeepers" />
-        <PosList pos="DEF" title="Defenders" />
-        <PosList pos="MID" title="Midfielders" />
-        <PosList pos="FWD" title="Forwards" />
 
       </div>
 
