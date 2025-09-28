@@ -284,8 +284,8 @@ body { background: #f6f7fb; }
 /* =======================
    Budget Block (Right column)
    ======================= */
-.budget-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
-.budget-amount{ font-weight:800; letter-spacing:.2px; }
+.card-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.row-data{ font-weight:800; letter-spacing:.2px; }
 .label{ display:block; margin-bottom: 6px; }
 
 /* =======================
