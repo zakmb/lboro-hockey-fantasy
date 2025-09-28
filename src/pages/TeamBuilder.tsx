@@ -327,9 +327,9 @@ export default function TeamBuilder(){
                   tabIndex={0}
                 >
                   <div className={`player-stat ${isSel ? 'is-selected' : ''}`}>
-                    <div className="stat-big">{p.pointsTotal}</div>
+                    <div className="stat-big">{p.pointsTotal/2}</div>
                     <div className="stat-label">Total</div>
-                    <div className="stat-sub">Prev GW {p.prevGwPoints}</div>
+                    <div className="stat-sub">Prev GW {p.pointsHistory[0]}</div>
                   </div>
                   <div className="player-meta">
                     <div className="player-name">{p.name}{isInjured(p.id) ? ' 🚑' : ''}</div>
@@ -433,7 +433,7 @@ export default function TeamBuilder(){
               {captainId===p.id && (<div className="captain">C</div>)}
               <div className={`chip-name ${isDefenders ? 'chip-name--sm' : ''}`}>{p.name}{isInjured(p.id) ? ' 🚑' : ''}</div>
               <div className="subtitle chip-pos">{p.position} - £{p.price}M</div>
-              <div className="chip-prev">Prev GW: {p.prevGwPoints}</div>
+              <div className="chip-prev">Prev GW: {p.pointsHistory[0]}</div>
             </div>
           )
         })}

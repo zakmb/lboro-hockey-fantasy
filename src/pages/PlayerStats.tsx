@@ -371,7 +371,7 @@ export default function PlayerStats() {
 									textAlign: 'center',
 									fontWeight: '500'
 								}}>
-									{player.prevGwPoints/2 || 0}
+									{player.pointsHistory[0] || 0}
 								</td>
 								<td style={{ 
 									padding: '12px', 
