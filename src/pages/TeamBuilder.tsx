@@ -327,7 +327,7 @@ export default function TeamBuilder(){
                   tabIndex={0}
                 >
                   <div className={`player-stat ${isSel ? 'is-selected' : ''}`}>
-                    <div className="stat-big">{p.pointsTotal/2}</div>
+                    <div className="stat-big">{p.pointsTotal}</div>
                     <div className="stat-label">Total</div>
                     <div className="stat-sub">Prev GW {p.pointsHistory[0]}</div>
                   </div>
