@@ -364,14 +364,14 @@ export default function PlayerStats() {
 									fontSize: '16px',
 									color: 'var(--primary)'
 								}}>
-									{player.pointsTotal || 0}
+									{player.pointsTotal/2 || 0}
 								</td>
 								<td style={{ 
 									padding: '12px', 
 									textAlign: 'center',
 									fontWeight: '500'
 								}}>
-									{player.prevGwPoints || 0}
+									{player.prevGwPoints/2 || 0}
 								</td>
 								<td style={{ 
 									padding: '12px', 
@@ -379,7 +379,7 @@ export default function PlayerStats() {
 									fontWeight: '600',
 									color: '#059669'
 								}}>
-									{player.goals || 0}
+									{player.goals/2 || 0}
 								</td>
                                 <td style={{ 
                                     padding: '12px', 
@@ -387,7 +387,7 @@ export default function PlayerStats() {
                                     fontWeight: '600',
                                     color: '#0ea5e9'
                                 }}>
-                                    {player.manOfTheMatchCount || 0}
+                                    {player.manOfTheMatchCount/2 || 0}
                                 </td>
 								<td style={{ 
 									padding: '12px', 
@@ -395,7 +395,7 @@ export default function PlayerStats() {
 									fontWeight: '600',
 									color: '#7c3aed'
 								}}>
-									{player.cleanSheets || 0}
+									{player.cleanSheets/2 || 0}
 								</td>
 								<td style={{ 
 									padding: '12px', 
@@ -403,7 +403,7 @@ export default function PlayerStats() {
 									fontWeight: '600',
 									color: '#059669'
 								}}>
-									{player.greenCards || 0}
+									{player.greenCards/2 || 0}
 								</td>
                                 <td style={{ 
                                     padding: '12px', 
@@ -411,7 +411,7 @@ export default function PlayerStats() {
                                     fontWeight: '600',
                                     color: '#d97706'
                                 }}>
-                                    {player.yellow5Cards || 0}
+                                    {player.yellow5Cards/2 || 0}
                                 </td>
                                 <td style={{ 
                                     padding: '12px', 
@@ -419,7 +419,7 @@ export default function PlayerStats() {
                                     fontWeight: '600',
                                     color: '#b45309'
                                 }}>
-                                    {player.yellow10Cards || 0}
+                                    {player.yellow10Cards/2 || 0}
                                 </td>
 								<td style={{ 
 									padding: '12px', 
@@ -427,7 +427,7 @@ export default function PlayerStats() {
 									fontWeight: '600',
 									color: '#dc2626'
 								}}>
-									{player.redCards || 0}
+									{player.redCards/2 || 0}
 								</td>
 								<td style={{ 
 									padding: '12px', 
