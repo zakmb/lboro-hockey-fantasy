@@ -142,9 +142,9 @@ async function addPlayerLocal(){
 	function calculatePoints(player: Player, changes: {goals: number, cleanSheets: number, greenCards: number, yellow5Cards: number, yellow10Cards: number, redCards: number, result: 'win'|'draw'|'loss'|'', manOfTheMatch: boolean}): number {
 		let points = 0
 		// Goals
-		if (player.position === 'FWD') points += changes.goals * 3
-		else if (player.position === 'MID') points += changes.goals * 4
-		else if (player.position === 'DEF' || player.position === 'GK') points += changes.goals * 5
+		if (player.position === 'FWD') points += changes.goals * 4
+		else if (player.position === 'MID') points += changes.goals * 5
+		else if (player.position === 'DEF') points += changes.goals * 6
 		// Clean sheets
 		if (player.position === 'GK') points += changes.cleanSheets * 10
 		else if (player.position === 'DEF') points += changes.cleanSheets * 8
