@@ -634,7 +634,7 @@ export default function TeamBuilder(){
         </div>
 
         <div className="card">
-          {!canSave && (
+          {!canSave && transfersEnabled && (
             <div className="errors" role="alert">
               <b>Fix the issues below to save your team:</b>
               <ul>
