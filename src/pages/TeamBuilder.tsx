@@ -181,7 +181,7 @@ export default function TeamBuilder(){
     if (counts.MID !== 3) errs.push('You must pick exactly 3 Midfielders.')
     if (counts.FWD !== 3) errs.push('You must pick exactly 3 Forwards.')
     if (!captainValid) errs.push('Select a captain from your 11 players.')
-    if (afterDeadline && !transfersEnabled && baseline.length > 0) errs.push('Transfer window closed. No changes allowed.')
+    //if (afterDeadline && !transfersEnabled && baseline.length > 0) errs.push('Transfer window closed. No changes allowed.')
     if (liveTransferPointsDeduction > 0) {
       errs.push(`${liveTransferPointsDeduction / 4} transfer${liveTransferPointsDeduction / 4 > 1 ? 's' : ''} over free limit will cost ${liveTransferPointsDeduction} points at gameweek end.`)
     }
