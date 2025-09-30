@@ -185,7 +185,7 @@ export default function TeamBuilder(){
     if (liveTransferPointsDeduction > 0) {
       errs.push(`${liveTransferPointsDeduction / 4} transfer${liveTransferPointsDeduction / 4 > 1 ? 's' : ''} over free limit will cost ${liveTransferPointsDeduction} points at gameweek end.`)
     }
-    if (squadCost > budget) errs.push(`Budget exceeded: £${squadCost.toFixed(1)}M / £${budget.toFixed(1)}M`)
+    //if (squadCost > budget) errs.push(`Budget exceeded: £${squadCost.toFixed(1)}M / £${budget.toFixed(1)}M`)
     return errs
   },[selected.length, counts, captainValid, afterDeadline, transfersEnabled, liveTransferPointsDeduction, squadCost, budget])
 
