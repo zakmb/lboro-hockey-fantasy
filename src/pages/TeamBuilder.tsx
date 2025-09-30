@@ -9,7 +9,6 @@ import { useInjuries } from '../contexts/InjuriesContext'
 
 const TEAMS: TeamCode[] = ['Men1','Men2','Men3','Men4','Men5']
 const FORMATION = { GK: 1, DEF: 4, MID: 3, FWD: 3 } as const
-const BUDGET_LIMIT = 100
 
 function getDeadline(): Date {
   const d = new Date(2025, 8, 26, 21, 0, 0, 0)
@@ -25,6 +24,7 @@ export default function TeamBuilder(){
   const [captainId, setCaptainId] = useState<string>('')
   const [baseline, setBaseline] = useState<string[]>([])
   const [baselineCaptain, setBaselineCaptain] = useState<string>('')
+  const [baselineBank, setBaselineBank] = useState<number>(100)
   const [transfersEnabled, setTransfersEnabled] = useState<boolean>(false)
   const [deadline, setDeadline] = useState<Date>(getDeadline())
   const [freeTransfers, setFreeTransfers] = useState<number>(1)
@@ -87,8 +87,8 @@ export default function TeamBuilder(){
       if (data?.wildcardPending !== undefined) setWildcardPending(!!data.wildcardPending)
       if (typeof data?.transferPointsDeduction === 'number') setTransferPointsDeduction(data.transferPointsDeduction)
       else setTransferPointsDeduction(0)
-      if (typeof data?.bank === 'number') setBank(data.bank)
-      else setBank(100)
+      if (typeof data?.bank === 'number') { setBank(data.bank); setBaselineBank(data.bank) }
+      else { setBank(100); setBaselineBank(100) }
       if (data?.tripleCaptainUsed !== undefined) setTripleCaptainUsed(!!data.tripleCaptainUsed)
       if (data?.tripleCaptainPending !== undefined) setTripleCaptainPending(!!data.tripleCaptainPending)
       if (typeof data?.teamPointsTotal === 'number') setTotalPoints(data.teamPointsTotal)
@@ -124,7 +124,6 @@ export default function TeamBuilder(){
   const counts = useMemo(()=> selectedPlayers.reduce((acc,p)=>{(acc as any)[p.position]++;return acc},{GK:0,DEF:0,MID:0,FWD:0} as Record<Position,number>),[selectedPlayers])
   const byTeam = useMemo(()=>{ const map: Record<TeamCode,number>={Men1:0,Men2:0,Men3:0,Men4:0,Men5:0}; selectedPlayers.forEach(p=>map[p.team]++); return map },[selectedPlayers])
   const squadCost = useMemo(()=> selectedPlayers.reduce((s,p)=> s + (p.price||0), 0), [selectedPlayers])
-  const budget = BUDGET_LIMIT
 
   const afterDeadline = useMemo(()=> Date.now() >= deadline.getTime(), [deadline])
 
@@ -165,11 +164,14 @@ export default function TeamBuilder(){
 
   const hasChanges = useMemo(() => {
     const playersChanged = JSON.stringify(selected.sort()) !== JSON.stringify(baseline.sort())
+    console.log(baseline)
+    console.log(selected)
+    console.log(playersChanged)
     const captainChanged = captainId !== baselineCaptain
     return playersChanged || captainChanged
   }, [selected, baseline, captainId, baselineCaptain])
 
-  const canSave = selected.length===11 && meetsFormation && captainValid && deadlinePolicyOk && squadCost <= budget
+  const canSave = selected.length===11 && meetsFormation && captainValid && deadlinePolicyOk && bank >= 0 && hasChanges
   const hardDisabled = afterDeadline && !transfersEnabled && baseline.length > 0
   const controlsDisabled = hardDisabled
 
@@ -181,13 +183,12 @@ export default function TeamBuilder(){
     if (counts.MID !== 3) errs.push('You must pick exactly 3 Midfielders.')
     if (counts.FWD !== 3) errs.push('You must pick exactly 3 Forwards.')
     if (!captainValid) errs.push('Select a captain from your 11 players.')
-    //if (afterDeadline && !transfersEnabled && baseline.length > 0) errs.push('Transfer window closed. No changes allowed.')
     if (liveTransferPointsDeduction > 0) {
       errs.push(`${liveTransferPointsDeduction / 4} transfer${liveTransferPointsDeduction / 4 > 1 ? 's' : ''} over free limit will cost ${liveTransferPointsDeduction} points at gameweek end.`)
     }
-    //if (squadCost > budget) errs.push(`Budget exceeded: £${squadCost.toFixed(1)}M / £${budget.toFixed(1)}M`)
+    if (bank < 0) errs.push(`Budget exceeded by £${bank.toFixed(1)}M`)
     return errs
-  },[selected.length, counts, captainValid, afterDeadline, transfersEnabled, liveTransferPointsDeduction, squadCost, budget])
+  },[selected.length, counts, captainValid, afterDeadline, transfersEnabled, liveTransferPointsDeduction, bank])
 
   function canPickByPosition(p: Player): boolean {
     const nc={...counts} as Record<Position,number>
@@ -197,8 +198,7 @@ export default function TeamBuilder(){
     if(p.position==='MID'&&nc.MID>3)return false
     if(p.position==='FWD'&&nc.FWD>3)return false
 
-    const newSquadCost = squadCost + p.price
-    if (newSquadCost > budget) return false
+    if (bank - p.price < 0) return false
 
     return selected.length < 11
   }
@@ -234,17 +234,14 @@ export default function TeamBuilder(){
   async function saveTeam(){
     if(!user||!canSave) return;
 
-    const currentSquadCost = selectedPlayers.reduce((total, p) => total + p.price, 0)
-    const nextBank = BUDGET_LIMIT - currentSquadCost
-
     const payload: any = {
       id: user.id,
       userId: user.id,
       displayName: user.displayName,
       players: selected,
       captainId,
-      bank: parseFloat(nextBank.toFixed(1)),
-      budget: BUDGET_LIMIT,
+      bank: parseFloat(bank.toFixed(1)),
+      budget: 100,
       tripleCaptainUsed,
       tripleCaptainPending,
       freeTransfers,
@@ -287,7 +284,7 @@ export default function TeamBuilder(){
     }
 
     await setDoc(doc(db,'teams',user.id), payload, { merge: true })
-    setBaseline(selected); setBaselineCaptain(captainId); setBank(payload.bank); 
+    setBaseline(selected); setBaselineCaptain(captainId); setBaselineBank(payload.bank); setBank(payload.bank); 
     if (payload.freeTransfers !== undefined) setFreeTransfers(payload.freeTransfers)
     if (payload.wildcardUsed !== undefined) setWildcardUsed(payload.wildcardUsed)
     if (payload.wildcardPending !== undefined) setWildcardPending(payload.wildcardPending)
@@ -298,9 +295,7 @@ export default function TeamBuilder(){
   function resetTeam(){
     setSelected(baseline)
     setCaptainId(baselineCaptain)
-    const baselinePlayers = baseline.map(id => pool.find(p => p.id === id)).filter(Boolean)
-    const baselineCost = baselinePlayers.reduce((total, p) => total + (p?.price || 0), 0)
-    setBank(BUDGET_LIMIT - baselineCost)
+    setBank(baselineBank)
   }
 
   const byPos = useMemo(()=>({
@@ -634,7 +629,7 @@ export default function TeamBuilder(){
         </div>
 
         <div className="card">
-          {!canSave && transfersEnabled && (
+          {errorMessages.length > 0 && transfersEnabled && (
             <div className="errors" role="alert">
               <b>Fix the issues below to save your team:</b>
               <ul>
@@ -650,7 +645,7 @@ export default function TeamBuilder(){
             >
               Save Team
             </button>
-            <button disabled={!hasChanges} className="btn secondary" onClick={resetTeam}>Reset</button>
+            <button disabled={!hasChanges} className={`btn secondary ${(hardDisabled || !canSave) ? 'btn--disabled' : ''}`} onClick={resetTeam}>Reset</button>
           </div>
         </div>
 
