@@ -164,9 +164,6 @@ export default function TeamBuilder(){
 
   const hasChanges = useMemo(() => {
     const playersChanged = JSON.stringify(selected.sort()) !== JSON.stringify(baseline.sort())
-    console.log(baseline)
-    console.log(selected)
-    console.log(playersChanged)
     const captainChanged = captainId !== baselineCaptain
     return playersChanged || captainChanged
   }, [selected, baseline, captainId, baselineCaptain])
