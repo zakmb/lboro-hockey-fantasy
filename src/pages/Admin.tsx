@@ -33,6 +33,7 @@ export default function Admin(){
 	const [gwChanges, setGwChanges] = useState<Record<string, {goals: number, cleanSheets: number, greenCards: number, yellow5Cards: number, yellow10Cards: number, redCards: number, result: 'win'|'draw'|'loss'|'', manOfTheMatch: boolean}>>({})
 	const [injurySelectId, setInjurySelectId] = useState<string>('')
 	const [importText, setImportText] = useState<string>('')
+	const [isFinalizing, setIsFinalizing] = useState(false);
 
 	// Add new state for bulk updates
 	const [bulkUpdate, setBulkUpdate] = useState<{
@@ -212,6 +213,7 @@ async function addPlayerLocal(){
 	},[sortedPlayers])
 
 	async function finalizeGameweek(){
+		setIsFinalizing(true);
 		try {
 			const batch = writeBatch(db)
 			
@@ -305,7 +307,9 @@ async function addPlayerLocal(){
 		} catch (error) {
 			console.error('Error finalizing gameweek:', error)
 			alert(`Failed to save data: ${error instanceof Error ? error.message : 'Unknown error'}. Please check your Firebase permissions or try again.`)
-		}
+		} finally {
+      		setIsFinalizing(false);
+        }
 	}
 
 	return (
@@ -802,7 +806,7 @@ async function addPlayerLocal(){
 					))}
 				</div>
 				<div style={{display:'flex',gap:8,marginTop:12}}>
-					<button className="btn" onClick={finalizeGameweek}>Finalize Gameweek (save all)</button>
+					<button className="btn" onClick={finalizeGameweek} disabled={isFinalizing}>Finalize Gameweek (save all)</button>
 					<button className="btn secondary" onClick={()=>{ setWorkingPlayers(players); setPendingIds(new Set()); setGwChanges({}) }}>Discard Changes</button>
 				</div>
 			</div>
