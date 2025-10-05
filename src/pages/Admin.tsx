@@ -174,7 +174,7 @@ async function addPlayerLocal(){
         setTimeout(() => {
             setWorkingPlayers(prev => prev.map(p => {
 				if (p.id !== playerId) return p
-                const changes = { ...(gwChanges[playerId] || {goals: 0, cleanSheets: 0, greenCards: 0, yellow5Cards: 0, yellow10Cards: 0, redCards: 0, result: '', manOfTheMatch: false}), [field]: value }
+                const changes = { ...(gwChanges[playerId] || {goals:0, cleanSheets:0, greenCards:0, yellow5Cards:0, yellow10Cards:0, redCards:0, result: '', manOfTheMatch: false}), [field]: value }
 				const gwPoints = calculatePoints(p, changes)
 				const originalTotal = Number(p.pointsTotal) || 0
 				const originalGw = Number(p.pointsGw) || 0
@@ -241,6 +241,20 @@ async function addPlayerLocal(){
 				updatedPlayer = dynUpdate(updatedPlayer as any) as any
 				
 				batch.update(doc(db,'players',playerId), updatedPlayer as any)
+			}
+
+			// Handle players who didn't play this gameweek
+			const playedPlayerIds = new Set(Object.keys(gwChanges));
+			for (const player of players) {
+				if (!playedPlayerIds.has(player.id)) {
+					let updatedPlayer = {
+						...player,
+						pointsHistory: [0, ...(player.pointsHistory || [])],
+						updatedAt: Date.now()
+					}
+				
+				batch.update(doc(db,'players',player.id), updatedPlayer as any)
+				}
 			}
 			
 			// Update team points
