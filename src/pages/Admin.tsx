@@ -285,13 +285,14 @@ async function addPlayerLocal(){
 				
 				// Use transfer deduction from database
 				const transferDeduction = Number(t.transferPointsDeduction) || 0
+				gw = gw - transferDeduction
 				
-				const total = (Number(t.teamPointsTotal)||0) + gw - transferDeduction
+				const total = (Number(t.teamPointsTotal)||0) + gw
 				const now = new Date()
 				const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`
 				const prevMonthly = (t.monthlyPoints && typeof t.monthlyPoints === 'object') ? t.monthlyPoints : {}
 				const currentMonthPoints = Number(prevMonthly?.[ym]) || 0
-				const nextMonthly = { ...prevMonthly, [ym]: currentMonthPoints + (gw - transferDeduction) }
+				const nextMonthly = { ...prevMonthly, [ym]: currentMonthPoints + gw }
 				const updateData: any = { 
 					teamPrevGwPoints: gw, 
 					teamPointsTotal: total, 
