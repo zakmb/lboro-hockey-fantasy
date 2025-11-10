@@ -37,17 +37,17 @@ export const maxPrice = 18.0;
 export const weeklyMaxChange = 1.4;
 
 // demand
-export const riseThreshold = 8;   
+export const riseThreshold = 4;   
 export const alphaDemand = 0.6;    
 
 // performance
 export const lookbackMatched = 4;
-export const kPerf = 0.1;         
+export const kPerf = 0.2;         
 export const alphaPerf = 0.6;      
 
 // hybrid weighting
-export const wDemand = 0.6;       
-export const wPerf = 0.4;        
+export const wDemand = 0.4;       
+export const wPerf = 0.6;        
 
 export function clamp(value: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, value));
