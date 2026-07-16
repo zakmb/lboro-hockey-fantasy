@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import type { Player, TeamCode, Position } from '../types'
 import { TEAM_LABEL } from '../types'
 import { db } from '../lib/firebase'
-import { doc, getDoc, onSnapshot, setDoc, collection, writeBatch } from 'firebase/firestore'
+import { doc, getDoc, onSnapshot, setDoc, getDocs, collection, writeBatch } from 'firebase/firestore'
 import { useAuth } from '../contexts/AuthContext'
 import { isAdmin } from '../config/adminEmails'
 import { useInjuries } from '../contexts/InjuriesContext'
@@ -71,7 +71,7 @@ export default function Admin(){
 		await setDoc(doc(db,'config','league'), { transfersEnabled: v }, { merge: true })
 		if (!v) {
 			const batch = writeBatch(db)
-			const snap = await (await import('firebase/firestore')).getDocs(collection(db,'teams'))
+			const snap = await getDocs(collection(db, 'teams'))
 			snap.forEach(d=>{ 
 				const data = d.data()
 				const updateData = createTeamUpdateData(data)
@@ -169,6 +169,24 @@ async function addPlayerLocal(){
 			const updated = { ...current, [field]: value }
 			return { ...prev, [playerId]: updated }
 		})
+
+        function recordGwResult(player: Player, gwPoints: number): Player {
+            const history = player.pointsHistory ?? [];
+            const newHistory = [gwPoints, ...history].slice(0, 20); // keep last 20 for safety
+
+            const matchesPlayed = (player.matchesPlayed ?? 0) + 1;
+            const pointsTotal = (player.pointsTotal ?? 0) + gwPoints;
+
+            return {
+                ...player,
+                pointsGw: gwPoints,
+                prevGwPoints: history[0] ?? player.prevGwPoints ?? 0,
+                pointsHistory: newHistory,
+                matchesPlayed,
+                pointsTotal,
+                updatedAt: Date.now()
+            };
+        }
 		
 		// Update working players with new points after state update
         setTimeout(() => {
@@ -216,7 +234,14 @@ async function addPlayerLocal(){
 		setIsFinalizing(true);
 		try {
 			const batch = writeBatch(db)
-			
+
+    const leagueRef = doc(db, 'config', 'league')
+    const leagueSnapshot = await getDoc(leagueRef)
+    const currentGameweek = Math.max(
+      1,
+      Number(leagueSnapshot.data()?.currentGameweek) || 1
+    )
+
 			// Update player stats by adding gameweek changes to totals
 			for (const playerId in gwChanges){
 				const changes = gwChanges[playerId]
@@ -268,7 +293,7 @@ async function addPlayerLocal(){
 				playerGwMap[playerId] = gwPoints
 			}
 			
-			const teamsSnap = await (await import('firebase/firestore')).getDocs(collection(db,'teams'))
+			const teamsSnap = await getDocs(collection(db, 'teams'))
 			teamsSnap.forEach(d=>{
 				const t = d.data() as any
 				const ids: string[] = Array.isArray(t.players)? t.players : []
@@ -293,12 +318,23 @@ async function addPlayerLocal(){
 				const prevMonthly = (t.monthlyPoints && typeof t.monthlyPoints === 'object') ? t.monthlyPoints : {}
 				const currentMonthPoints = Number(prevMonthly?.[ym]) || 0
 				const nextMonthly = { ...prevMonthly, [ym]: currentMonthPoints + gw }
-				const updateData: any = { 
+				
+      const previousGameweekPoints =
+        t.gameweekPoints && typeof t.gameweekPoints === 'object'
+          ? t.gameweekPoints
+          : {}
+
+      const nextGameweekPoints = {
+        ...previousGameweekPoints,
+        [String(currentGameweek)]: gw
+      }
+const updateData: any = { 
 					teamPrevGwPoints: gw, 
 					teamPointsTotal: total, 
 					updatedAt: Date.now(),
 					transferPointsDeduction: 0, // Reset to 0 after applying deductions
-					monthlyPoints: nextMonthly
+					monthlyPoints: nextMonthly,
+        gameweekPoints: nextGameweekPoints
 				}
 				
 				if (triplePending) {
@@ -311,6 +347,16 @@ async function addPlayerLocal(){
 				batch.set(doc(db,'teams',d.id), updateData, { merge: true })
 			})
 			
+    batch.set(
+      leagueRef,
+      {
+        currentGameweek: currentGameweek + 1,
+        lastFinalizedGameweek: currentGameweek,
+        updatedAt: Date.now()
+      },
+      { merge: true }
+    )
+
 			// Reset gameweek changes and points
 			for (const p of workingPlayers){
 				batch.update(doc(db,'players',p.id), { prevGwPoints: p.pointsGw, pointsGw: 0, updatedAt: Date.now() } as any)
